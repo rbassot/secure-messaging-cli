@@ -17,17 +17,8 @@ class ServerThread(Thread):
         print("New client thread created")
         self.sock = socket
         self.addr = address
+        #self.username? To determine if the client is logged in, so 'send', etc can be performed
         self.start()
-
-
-    def close_client_connection(self):
-        #notify the client that their connection is being closed
-        response = "{'response':'SUCCESS', 'message':'Successfully closing the connection.'}"
-        serialized_resp = json.dumps(response).encode()
-        self.sock.send(serialized_resp)
-
-        #close client's socket connection
-        self.sock.close()
 
 
     def handle_send_message(self, encr_message, send_client, recv_client, image_attached):
@@ -71,15 +62,18 @@ class ServerThread(Thread):
             try:
                 client_data = self.sock.recv(1024)
 
-            #add 'if not data: ...'
             except:
                 pass
 
+            #0 bytes of data sent - connection must have been closed by the client
             if not client_data:
-                #connection must have been closed by the client
+                print("Client at " + str(self.addr) + " has closed the connection.")
                 return
 
+            #***authentication check against the client required.***
+            #handle parsing the client's request here, which should be in the form of ciphertext + signature
 
+            #parse the client's request
             client_req = json.loads(client_data.decode())
             client_req = ast.literal_eval(client_req)
 
@@ -87,9 +81,7 @@ class ServerThread(Thread):
             print(client_req)
             print("Client sent request for: " + client_req['command'])
 
-            #authentication check against the client required. 
-            #handle parsing the client's request here, which should be in the form of cipher + signature
-
+            #handle various client requests
             if(client_req['command'] == 'login'):
                 self.handle_login_req(client_req['username'], client_req['password'])
 
@@ -101,8 +93,9 @@ class ServerThread(Thread):
             elif(client_req['command'] == 'send'):
                 self.handle_send_message()
 
-            elif(client_req['command'] == 'exit'):
-                self.close_client_connection()
+            #Shouldn't need exit handling - returning from the thread above properly cleans it up
+            '''elif(client_req['command'] == 'exit'):
+                self.close_client_connection()'''
 
 
     #continuous execution of the thread - function override
@@ -111,7 +104,8 @@ class ServerThread(Thread):
         #authentication needs to be done first??
         #accept connection from client
         self.new_connection()
-        #temporary return to terminate the thread
+
+        #temporary return to terminate the thread - where will this be placed?
         return
 
         while True:

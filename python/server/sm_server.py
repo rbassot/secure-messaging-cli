@@ -34,6 +34,7 @@ def start_server():
         connections.append(client_sock)
         client_sock.send(b"You are connected from: " + str(client_addr).encode())
 
+    #unreachable - how do we gracefully terminate the server? Do we even want to do this?
     sock.close()
     sys.exit()
 

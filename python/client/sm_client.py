@@ -77,6 +77,8 @@ def login_attempt():
 def login_or_register():
 
     #offer client login options
+    sleep(1)
+    clear_screen()
     print()
     print("----- Welcome to Python CLI Secure Messaging! -----")
     print("OPTIONS:")
@@ -87,9 +89,14 @@ def login_or_register():
 
     #user option loop
     while True:
-        option = input(">> ")
 
         try:
+            #get user's option selection
+            option = input(">> ")
+
+            if not option:
+                continue
+
             #handle login
             if(option == "--login"):
                 result = login_attempt()
@@ -107,6 +114,7 @@ def login_or_register():
             #handle program exit
             elif(option == "--exit"):
                 close_server_conn()
+                return 0
 
             else:
                 print("Please pass a valid command.")
@@ -115,17 +123,26 @@ def login_or_register():
         #terminate the client on keyboard interrupt
         except KeyboardInterrupt:
             close_server_conn()
+            return 0
 
+    return 1
 
 
 def close_server_conn():
-    #notify the server of a closing connection
+    '''#notify the server of a closing connection
     closing_req = "{'command':'exit', 'username':'%s'}"%(client_username)
     #must encrypt the closing req data here (encryption manager?)
     serialized_req = json.dumps(closing_req).encode()
     sock.send(serialized_req)
+    '''
 
-    #wait for server confirmation
+    #notify the server that connection should be terminated
+    sock.shutdown(SHUT_RDWR)
+    sock.close()
+    print("Connection was closed. Program is exiting gracefully.")
+    return
+
+    '''#wait for server confirmation
     server_resp = json.loads(sock.recv(1024).decode())
     server_resp = ast.literal_eval(server_resp)
 
@@ -139,6 +156,8 @@ def close_server_conn():
     else:
         print("Exit attempt failed!")
         return 0
+    '''
+
 
 #To implement
 def enter_chat(recv_username):
@@ -167,6 +186,9 @@ def main_menu():
             #get user input for writing a message
             user_input = input(">> ")
 
+            if not user_input:
+                continue
+
             #first parse the user input string
             option, recv_user = parse_main_menu_input(user_input)
 
@@ -176,22 +198,29 @@ def main_menu():
 
             #handle program exit
             elif(option == "--exit"):
-                if(close_server_conn()):
-                    break
+                close_server_conn()
+                return 1
+
+            #handle user logout - exit main menu scope
+            elif(option == "--logout"):
+                #handle_logout()
+                break
 
             else:
                 print("Please pass a valid command.")
                 continue
 
+        #catch argument length errors
         except ValueError as e:
             print(e)
 
         #terminate the client on keyboard interrupt
         except KeyboardInterrupt:
             close_server_conn()
+            return 0
 
-    #terminate client program
-    exit(0)   
+    #exit main menu scope
+    return 1  
 
 
 def start_client():
@@ -206,8 +235,9 @@ def start_client():
     #--- Login Menu ---
     while True:
 
-        #initial login/register options
-        login_or_register()
+        #initial login/registration handling
+        if(not login_or_register()):
+            break
 
         #first encounter with main menu - display options
         display_options()
@@ -218,10 +248,16 @@ def start_client():
             #recv_msg = client_sock.recv(1024)
             #print(recv_msg)
 
-            main_menu()
+            #handle main menu interface
+            #graceful program exit
+            if not (main_menu()):
+                return
+
+            #return to login/register menu
+            break
 
 
-    sock.close()
+    return
 
 
 if __name__ == "__main__":
