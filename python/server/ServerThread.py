@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from sys import *
 from socket import *
 from threading import *
 import json
@@ -19,11 +20,44 @@ class ServerThread(Thread):
         self.start()
 
 
+    def close_client_connection(self):
+        #notify the client that their connection is being closed
+        response = "{'response':'SUCCESS', 'message':'Successfully closing the connection.'}"
+        serialized_resp = json.dumps(response).encode()
+        self.sock.send(serialized_resp)
+
+        #close client's socket connection
+        self.sock.close()
+
+
+    def handle_send_message(self, encr_message, send_client, recv_client, image_attached):
+        #implement receiving a message from sender and forwarding to the receiver
+        #-user authenticity established before this point (via digital signature)
+        #-message is encrypted by sender (SHA256?) and can only be decrypted by receiver (via private key?) once received
+        #-every new encrypted message should be added to storage at the server *TWICE*:
+        #     -->Once from perspective of the sender & Again from the perspective of the receiver (send/recv users are swapped)
+        #     -->This will allow one user to delete their message history w/o affecting the other's
+        #     (potentially include pre-populated DB with some messages)
+        #-**optional** should a receiving user NOT be online, the server should still store the message and notify the sender.
+        #   Then, upon connection of the receiving user to the server, the waiting encrypted message should be forwarded
+        pass
+
+    
+    def handle_registration(self, client_username, client_password, client_first, client_last):
+        #implement registration with database here
+        #User fields: account_id, username, password, first_name, last_name
+        #-check that username is unique
+        #-get next ID and assign it to the new user
+        #-store new account info in the DB - the password (others?) should certainly be stored in encrypted form
+        pass
+
+
     def handle_login_req(self, client_username, client_password):
         #temporary check if username/login can be read from data
         #should instead query the database to retrieve a single tuple
+        #FIX!!
         response = ""
-        if(client_username == 'username' and client_password == 'password'):
+        if(client_username == 'u' and client_password == 'p'):
             response = "{'response':'SUCCESS', 'message':'Successfully logged in.'}"
         else:
             response = "{'response':'FAILURE', 'message':'Login was not successful!'}"
@@ -37,8 +71,14 @@ class ServerThread(Thread):
             try:
                 client_data = self.sock.recv(1024)
 
+            #add 'if not data: ...'
             except:
                 pass
+
+            if not client_data:
+                #connection must have been closed by the client
+                return
+
 
             client_req = json.loads(client_data.decode())
             client_req = ast.literal_eval(client_req)
@@ -47,20 +87,32 @@ class ServerThread(Thread):
             print(client_req)
             print("Client sent request for: " + client_req['command'])
 
+            #authentication check against the client required. 
+            #handle parsing the client's request here, which should be in the form of cipher + signature
+
             if(client_req['command'] == 'login'):
                 self.handle_login_req(client_req['username'], client_req['password'])
 
             #To implement
             elif(client_req['command'] == 'register'):
-                pass
+                self.handle_registration()
+
+            #To implement
+            elif(client_req['command'] == 'send'):
+                self.handle_send_message()
+
+            elif(client_req['command'] == 'exit'):
+                self.close_client_connection()
 
 
-    #continuous execution of the thread
+    #continuous execution of the thread - function override
     def run(self):
 
         #authentication needs to be done first??
         #accept connection from client
         self.new_connection()
+        #temporary return to terminate the thread
+        return
 
         while True:
             try:
