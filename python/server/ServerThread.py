@@ -8,13 +8,13 @@ import ast
 #from PIL import Image
 
 '''
-Basic ClientThread class for server-side handling of multiple threads.
+Basic ServerThread class for server-side handling of multiple clients.
 '''
 
 class ServerThread(Thread):
     def __init__(self, socket, address):    #Inherit from Thread class
         Thread.__init__(self)
-        print("New client thread created")
+        print("New server thread created for client at: " + str(address))
         self.sock = socket
         self.addr = address
         #self.username? To determine if the client is logged in, so 'send', etc can be performed

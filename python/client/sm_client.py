@@ -2,11 +2,15 @@
 
 from sys import *
 from socket import *
+from threading import *
 from sqlite3 import * #For future database implementation
 from os import *
 from time import *
 import json
 import ast
+
+from ClientSendThread import ClientSendThread
+from ClientRecvThread import ClientRecvThread
 
 
 #----- Client Parameters -----
@@ -15,30 +19,10 @@ SERVER_PORT = 50007
 sock = socket(AF_INET, SOCK_STREAM) #connection object to the server
 client_username = None
 client_key = None                   #dictionary of client keys needed for user authorization
+threads = []
 
 def clear_screen():
     system('clear')
-
-
-def display_options():
-    #main menu introduction
-    print()
-    print("----- Welcome to the main menu -----")
-
-    #display all user options
-    print("OPTIONS:")
-    print("--chat:<username>                Start a secure chat with an existing user.")
-    print("--quit-chat                      Quit the current chat and return to the main menu.")
-    print("--history:<username>             View your conversation history with a user.")
-    print("--delete-history:<username>      Delete your conversation history with a specific user.")
-    print("--logout                         Log out of your account and return to the main menu.")
-    print("--delete-account                 Delete your account and return to the main menu.")
-    print("--exit                           Gracefully logout and exit Python CLI Secure Messaging.")
-    print("--options                        Display available options from this menu.")
-    print()
-    #**should add functionality for a user to view an image that was attached in a previous message**
-
-
 
 
 def login_attempt():
@@ -70,12 +54,12 @@ def login_attempt():
             return 0
 
     #FIX!!
-    except Exception as e:
-        print(e)
+    except:
+        print("Something went wrong...")
+        return 0
 
 
 def login_or_register():
-
     #offer client login options
     sleep(1)
     clear_screen()
@@ -129,98 +113,11 @@ def login_or_register():
 
 
 def close_server_conn():
-    '''#notify the server of a closing connection
-    closing_req = "{'command':'exit', 'username':'%s'}"%(client_username)
-    #must encrypt the closing req data here (encryption manager?)
-    serialized_req = json.dumps(closing_req).encode()
-    sock.send(serialized_req)
-    '''
-
     #notify the server that connection should be terminated
     sock.shutdown(SHUT_RDWR)
     sock.close()
     print("Connection was closed. Program is exiting gracefully.")
     return
-
-    '''#wait for server confirmation
-    server_resp = json.loads(sock.recv(1024).decode())
-    server_resp = ast.literal_eval(server_resp)
-
-    #close the client-side socket if response was successful
-    if(server_resp['response'] == 'SUCCESS'):
-        print()
-        print("Connection was closed. Program is exiting gracefully.")
-        return 1
-        #exit(0)
-
-    else:
-        print("Exit attempt failed!")
-        return 0
-    '''
-
-
-#To implement
-def enter_chat(recv_username):
-    pass
-
-
-def parse_main_menu_input(input_str):
-    #place arguments into a list
-    args = input_str.split(":")
-
-    #assert that there are only either 1 or 2 arguments
-    if(len(args) > 2):
-        raise ValueError("Please provide a command with 2 or less arguments.")
-
-    elif(len(args) < 2):
-        return args[0], None
-
-    return args[0], args[1]
-
-
-def main_menu():
-    #continuously accept user input from the main menu
-    while True:
-
-        try:
-            #get user input for writing a message
-            user_input = input(">> ")
-
-            if not user_input:
-                continue
-
-            #first parse the user input string
-            option, recv_user = parse_main_menu_input(user_input)
-
-            #handle starting a chat
-            if(option == "--chat"):
-                enter_chat(recv_user)
-
-            #handle program exit
-            elif(option == "--exit"):
-                close_server_conn()
-                return 1
-
-            #handle user logout - exit main menu scope
-            elif(option == "--logout"):
-                #handle_logout()
-                break
-
-            else:
-                print("Please pass a valid command.")
-                continue
-
-        #catch argument length errors
-        except ValueError as e:
-            print(e)
-
-        #terminate the client on keyboard interrupt
-        except KeyboardInterrupt:
-            close_server_conn()
-            return 0
-
-    #exit main menu scope
-    return 1  
 
 
 def start_client():
@@ -239,23 +136,37 @@ def start_client():
         if(not login_or_register()):
             break
 
-        #first encounter with main menu - display options
-        display_options()
+        #create an object able to stop a running thread immediately
+        pill2kill = Event()
 
-        #--- Main Menu ---
+        #user has logged in: create 2 threads - one for sending, one for receiving
+        global threads
+        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), pill2kill)
+        threads.append(send_thread)
+        recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), pill2kill)
+        threads.append(recv_thread)
+
+        #set threads to daemons for auto cleanup on program exit
+        send_thread.daemon = True
+        recv_thread.daemon = True
+        send_thread.start()
+        recv_thread.start()
+
+        #delay loop to check for connection closing
         while True:
-            #poll the server for messages
-            #recv_msg = client_sock.recv(1024)
-            #print(recv_msg)
+            try:
+                send_thread.join()
+                pill2kill.set()
+                recv_thread.join()
 
-            #handle main menu interface
-            #graceful program exit
-            if not (main_menu()):
+                #return to login menu scope
+                print("Logging out of " + client_username)
+                break
+
+            #exit program - daemon threads are cleaned up automatically
+            except (BaseException, KeyboardInterrupt) as e:
+                print("Gracefully closing the client program.")
                 return
-
-            #return to login/register menu
-            break
-
 
     return
 
