@@ -141,7 +141,7 @@ def start_client():
 
         #user has logged in: create 2 threads - one for sending, one for receiving
         global threads
-        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), pill2kill)
+        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username, pill2kill)
         threads.append(send_thread)
         recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), pill2kill)
         threads.append(recv_thread)

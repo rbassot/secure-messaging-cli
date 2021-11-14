@@ -9,18 +9,20 @@ import json
 import ast
 #from PIL import Image
 
+import config
+
 '''
 Basic ClientSendThread class for the client-side to handle user interface/interaction & send requests to the server.
 '''
 
 class ClientSendThread(Thread):
-    def __init__(self, socket, address, event):    #Inherit from Thread class
+    def __init__(self, socket, address, username, event):    #Inherit from Thread class
         Thread.__init__(self)
         self.sock = socket
         self.addr = address
+        self.username = username    #self.username? To determine if the client is logged in, so 'send', etc can be performed
         self.kill_event = event
         self.exception = None
-        #self.username? To determine if the client is logged in, so 'send', etc can be performed
 
 
     #Override: to be able to pass the exception to the called thread (main)
@@ -31,27 +33,55 @@ class ClientSendThread(Thread):
         if self.exception:
             raise self.exception
 
+    
+    #Function to acquire shared resource (stdout file descriptor) before printing to screen
+    def locked_print(self, message_str):
+        try:
+            config.lock.acquire()
+            print(message_str)
+            config.lock.release()
+            return
+
+        except:
+            #print("Error acquiring the lock for printing!")
+            return
+
+
+    #Function to acquire shared resource (stdin file descriptor) before receiving user input
+    def locked_input(self, prompt):
+        #if the sender thread is the only thread using stdin, do we need to lock on input?
+        try:
+            #config.lock.acquire()
+            user_input = input(prompt)
+            #config.lock.release()
+            return user_input
+
+        except:
+            #print("Error acquiring the lock for input!")
+            return
+
 
     def clear_screen(self):
         system('clear')
+        return
 
 
     def display_options(self):
         #main menu introduction
-        print()
-        print("----- Welcome to the main menu -----")
+        self.locked_print("")
+        self.locked_print("----- Welcome to the main menu -----")
 
         #display all user options
-        print("OPTIONS:")
-        print("--chat:<username>                Start a secure chat with an existing user.")
-        print("--quit-chat                      Quit the current chat and return to the main menu.")
-        print("--history:<username>             View your conversation history with a user.")
-        print("--delete-history:<username>      Delete your conversation history with a specific user.")
-        print("--logout                         Log out of your account and return to the main menu.")
-        print("--delete-account                 Delete your account and return to the main menu.")
-        print("--exit                           Gracefully logout and exit Python CLI Secure Messaging.")
-        print("--options                        Display available options from this menu.")
-        print()
+        self.locked_print("OPTIONS:")
+        self.locked_print("--chat:<username>                Start a secure chat with an existing user.")
+        self.locked_print("--quit-chat                      Quit the current chat and return to the main menu.")
+        self.locked_print("--history:<username>             View your conversation history with a user.")
+        self.locked_print("--delete-history:<username>      Delete your conversation history with a specific user.")
+        self.locked_print("--logout                         Log out of your account and return to the main menu.")
+        self.locked_print("--delete-account                 Delete your account and return to the main menu.")
+        self.locked_print("--exit                           Gracefully logout and exit Python CLI Secure Messaging.")
+        self.locked_print("--options                        Display available options from this menu.")
+        self.locked_print("")
         #**should add functionality for a user to view an image that was attached in a previous message**
 
 
@@ -59,13 +89,21 @@ class ClientSendThread(Thread):
         #notify the server that connection should be terminated
         self.sock.shutdown(SHUT_RDWR)
         self.sock.close()
-        print("(Send Thread) Connection was closed. Program is exiting gracefully.")
+        self.locked_print("(Send Thread) Connection was closed. Program is exiting gracefully.")
         return
 
 
-    #To implement
     def enter_chat(self, recv_username):
-        pass
+        system('clear')
+        self.locked_print("Connecting with " + str(recv_username) + "...")
+        try:
+            connect_req = "{'cmd':'chat','send_username':'%s','recv_username':'%s','message':'Connect with user'}"%(self.username, recv_username)
+            serialized_req = json.dumps(connect_req).encode()
+            self.sock.send(serialized_req)
+
+        except:
+            self.locked_print("There was an issue with sending the chat request...")
+        return
 
 
     def parse_main_menu_input(self, input_str):
@@ -88,7 +126,7 @@ class ClientSendThread(Thread):
 
             try:
                 #get user input for writing a message
-                user_input = input(">> ")
+                user_input = self.locked_input(">> ")
 
                 if not user_input:
                     continue
@@ -111,17 +149,17 @@ class ClientSendThread(Thread):
                     return 1
 
                 else:
-                    print("Please pass a valid command.")
+                    self.locked_print("Please pass a valid command.")
                     continue
 
             #catch argument length errors
             except ValueError as e:
-                print(e)
+                self.locked_print(e)
 
             #terminate the client threads on keyboard interrupt & exit program
             #**Windows bug fix for catching KeyboardInterrupts on input() - include EOFError**
             except (KeyboardInterrupt, EOFError) as e:
-                print(e)
+                self.locked_print(e)
                 self.close_server_conn()
                 return 0
 
@@ -136,7 +174,7 @@ class ClientSendThread(Thread):
             #handle main menu interface
             #graceful program exit - throws an exception for the main thread to be notified
             if not (self.main_menu()):
-                print("Raising BaseException")
+                self.locked_print("Raising BaseException")
                 self.exception = BaseException
                 return
 
