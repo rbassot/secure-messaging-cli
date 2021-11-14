@@ -7,6 +7,8 @@ import json
 import ast
 #from PIL import Image
 
+from DatabaseImpl import DatabaseImpl
+
 '''
 Basic ServerThread class for server-side handling of multiple clients.
 '''
@@ -17,6 +19,7 @@ class ServerThread(Thread):
         print("New server thread created for client at: " + str(address))
         self.sock = socket
         self.addr = address
+        self.db = DatabaseImpl()
         #self.username? To determine if the client is logged in, so 'send', etc can be performed
         self.start()
 

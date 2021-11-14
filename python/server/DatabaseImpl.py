@@ -17,16 +17,32 @@ class DatabaseImpl():
         self.create_Accounts_table()
         self.create_Messages_table()
 
+
     def get_row_count(self, table_name):
         query = "SELECT COUNT(*) FROM " + str(table_name) + ";"
         return int(self.db_connection.execute(query))
 
-    def add_new_account(self, id, first_name, last_name, username, password):
+
+    def insert_new_account(self, id, first_name, last_name, username, password):
         data = [(id, first_name, last_name, username, password)]
         query = '''INSERT INTO Account VALUES(?, ?, ?, ?, ?)'''
         self.db_connection.execute(query, data)
 
-    def create_Accounts_table(self):
+
+    def insert_new_message(self, id, send_username, recv_username, encr_message):
+        data = [(id, send_username, recv_username, encr_message)]
+        query = '''INSERT INTO Message VALUES(?, ?, ?, ?)'''
+        self.db_connection.execute(query, data)
+
+    def get_username_password_entry(self, username, password):
+        query = "SELECT * FROM Account WHERE username = '" + username + "' AND password = '" + password + "';"
+        result = self.db_connection.execute(query)
+        pass
+        #TO IMPLEMENT
+        #if result
+
+
+    def create_Account_table(self):
         query = '''CREATE TABLE Account(
                     id INTEGER NOT NULL AUTOINCREMENT,
                     first_name TEXT,
@@ -37,7 +53,7 @@ class DatabaseImpl():
         self.db_connection.execute(query)
 
 
-    def create_Messages_table(self):
+    def create_Message_table(self):
         query = '''CREATE TABLE Message(
                     id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                     send_username TEXT,
