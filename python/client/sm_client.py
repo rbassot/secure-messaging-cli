@@ -25,6 +25,39 @@ def clear_screen():
     system('clear')
 
 
+def register_attempt():
+    clear_screen()
+    first_name = input("First name: ")
+    last_name = input("Last name: ")
+    username = input("Username: ")
+    password = input("Password: ")
+
+    try:
+        #send formatted login data to server
+        login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, password)
+        #must encrypt the login data here (encryption manager?)
+        serialized_req = json.dumps(login_req).encode()
+        sock.send(serialized_req)
+
+        #receive response from server
+        server_resp = json.loads(sock.recv(1024).decode())
+        server_resp = ast.literal_eval(server_resp)
+        print("Server response type: " + str(server_resp['response']))
+
+        if(server_resp['response'] == 'SUCCESS'):
+            print(server_resp['message'])
+            return 1
+
+        elif(server_resp['response'] == 'FAILURE'):
+            print("Registration attempt failed!")
+            return 0
+
+    #FIX!!
+    except:
+        print("Something went wrong...")
+        return 0
+
+
 def login_attempt():
     clear_screen()
     username = input("Username: ")
@@ -92,8 +125,12 @@ def login_or_register():
 
             #handle account registration
             elif(option == "--register"):
-                #To implement
-                pass
+                result = register_attempt()
+                
+                if(result):
+                    clear_screen()
+                    print("Account registration successful.")
+                    continue
 
             #handle program exit
             elif(option == "--exit"):

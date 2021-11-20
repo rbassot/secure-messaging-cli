@@ -7,7 +7,7 @@ import json
 import ast
 #from PIL import Image
 
-from DatabaseImpl import DatabaseImpl
+from DatabaseConnection import DatabaseConn
 
 '''
 Basic ServerThread class for server-side handling of multiple clients.
@@ -19,7 +19,7 @@ class ServerThread(Thread):
         print("New server thread created for client at: " + str(address))
         self.sock = socket
         self.addr = address
-        self.db = DatabaseImpl()
+        self.db_conn = None
         #self.username? To determine if the client is logged in, so 'send', etc can be performed
         self.start()
 
@@ -37,25 +37,35 @@ class ServerThread(Thread):
         pass
 
     
-    def handle_registration(self, client_username, client_password, client_first, client_last):
+    def handle_registration(self, client_first, client_last, client_username, client_password):
         #implement registration with database here
         #User fields: account_id, username, password, first_name, last_name
         #-check that username is unique
         #-get next ID and assign it to the new user
         #-store new account info in the DB - the password (others?) should certainly be stored in encrypted form
-        pass
+
+        #pass account info to database object for account creation
+        response = ""
+        if(self.db_conn.insert_new_account(client_first, client_last, client_username, client_password)):
+            response = "{'response':'SUCCESS', 'message':'Successfully created account.'}"
+
+        else:
+            response = "{'response':'FAILURE', 'message':'Account creation was not successful!'}"
+
+        serialized_resp = json.dumps(response).encode()
+        self.sock.send(serialized_resp)
 
 
     def handle_login_req(self, client_username, client_password):
         #temporary check if username/login can be read from data
-        #should instead query the database to retrieve a single tuple
         #FIX!!
         response = ""
-        if(client_username == 'u' and client_password == 'p'):
+        if(self.db_conn.is_valid_username_password(client_username, client_password)):
             response = "{'response':'SUCCESS', 'message':'Successfully logged in.'}"
         else:
             response = "{'response':'FAILURE', 'message':'Login was not successful!'}"
 
+        print(response)
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
 
@@ -90,7 +100,7 @@ class ServerThread(Thread):
 
             #To implement
             elif(client_req['command'] == 'register'):
-                self.handle_registration()
+                self.handle_registration(client_req['first'], client_req['last'], client_req['username'], client_req['password'])
 
             #To implement
             elif(client_req['command'] == 'send'):
@@ -105,6 +115,10 @@ class ServerThread(Thread):
     def run(self):
 
         #authentication needs to be done first??
+        
+        #create a database connection objet for this server thread
+        self.db_conn = DatabaseConn()
+
         #accept connection from client
         self.new_connection()
 
