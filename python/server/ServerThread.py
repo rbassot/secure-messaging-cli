@@ -7,6 +7,7 @@ import json
 import ast
 #from PIL import Image
 
+import config
 from DatabaseConnection import DatabaseConn
 
 '''
@@ -57,10 +58,10 @@ class ServerThread(Thread):
 
 
     def handle_login_req(self, client_username, client_password):
-        #temporary check if username/login can be read from data
-        #FIX!!
+        #check if account is registered & that it is not currently connected with the server
+        #FIX!! config.auth....
         response = ""
-        if(self.db_conn.is_valid_username_password(client_username, client_password)):
+        if(client_username not in config.authorized_users and self.db_conn.is_valid_username_password(client_username, client_password)):
             response = "{'response':'SUCCESS', 'message':'Successfully logged in.'}"
         else:
             response = "{'response':'FAILURE', 'message':'Login was not successful!'}"
@@ -85,6 +86,7 @@ class ServerThread(Thread):
 
             #***authentication check against the client required.***
             #handle parsing the client's request here, which should be in the form of ciphertext + signature
+            #add authenticated user to config's global list
 
             #parse the client's request
             client_req = json.loads(client_data.decode())
@@ -112,11 +114,8 @@ class ServerThread(Thread):
 
 
     #continuous execution of the thread - function override
-    def run(self):
-
-        #authentication needs to be done first??
-        
-        #create a database connection objet for this server thread
+    def run(self):        
+        #create a database connection object for this server thread
         self.db_conn = DatabaseConn()
 
         #accept connection from client

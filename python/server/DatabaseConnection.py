@@ -57,8 +57,8 @@ class DatabaseConn():
         #get row count for ID field
         cursor = self.db_connection.cursor()
         row_count = self.get_Message_row_count()
-        data = [(row_count + 1, send_username, recv_username, encr_message)]
-        query = '''INSERT INTO Message VALUES(?, ?, ?, ?)'''
+        data = [row_count + 1, send_username, recv_username, encr_message]
+        query = "INSERT INTO Message... VALUES(?, ?, ?, ?)"
         cursor.execute(query, data)
         self.db_connection.commit()
 

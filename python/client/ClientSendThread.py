@@ -140,11 +140,13 @@ class ClientSendThread(Thread):
 
                 #handle program exit
                 elif(option == "--exit"):
+                    #MUST notify the server here to remove client from auth_users + connections lists
                     self.close_server_conn()
                     return 0
 
                 #handle user logout - exit main menu scope
                 elif(option == "--logout"):
+                    #MUST notify the server here to remove client from auth_users + connections lists
                     #self.close_server_conn()
                     return 1
 

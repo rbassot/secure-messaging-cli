@@ -92,17 +92,22 @@ def login_attempt():
         return 0
 
 
-def login_or_register():
-    #offer client login options
-    sleep(1)
-    clear_screen()
-    print()
+def display_login_options():
+    #display welcome message & user login menu options
+    print("")
     print("----- Welcome to Python CLI Secure Messaging! -----")
     print("OPTIONS:")
     print("--login          Log in to an existing user account.")
     print("--register       Create a new user account.")
     print("--exit           Gracefully exit Python CLI Secure Messaging.")
-    print()
+    print("")
+
+
+def login_or_register():
+    #offer client login options
+    sleep(1)
+    clear_screen()
+    display_login_options()
 
     #user option loop
     while True:
@@ -112,6 +117,12 @@ def login_or_register():
             option = input(">> ")
 
             if not option:
+                continue
+
+            #handle options
+            if(option == "--options"):
+                clear_screen()
+                display_login_options()
                 continue
 
             #handle login
