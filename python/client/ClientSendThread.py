@@ -94,6 +94,13 @@ class ClientSendThread(Thread):
 
 
     def enter_chat(self, recv_username):
+        #retrieve requested user's public key bundle from the server DB
+        #(sending placeholder message)
+        #establish X3DH authentication
+    
+        #on every new message, recalculate the shared key prior to sending
+
+        #locked_print req'd here
         system('clear')
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
