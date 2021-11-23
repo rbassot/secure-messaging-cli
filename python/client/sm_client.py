@@ -14,11 +14,12 @@ from ClientRecvThread import ClientRecvThread
 
 
 #----- Client Parameters -----
-SERVER_HOST = '127.0.0.1'           #bind to public IP
+SERVER_HOST = '127.0.0.1'                    #bind to public IP
 SERVER_PORT = 50007
-sock = socket(AF_INET, SOCK_STREAM) #connection object to the server
+sock = socket(AF_INET, SOCK_STREAM)          #connection object to the server for client-to-client interactions
+#chat_socket = socket(AF_INET, SOCK_STREAM)   #connection object to the server to create 
 client_username = None
-client_key = None                   #dictionary of client keys needed for user authorization
+client_key = None                            #dictionary of client keys needed for user authorization
 threads = []
 
 def clear_screen():
@@ -184,19 +185,20 @@ def start_client():
         if(not login_or_register()):
             break
 
-        #create an object able to stop a running thread immediately
-        pill2kill = Event()
+        #create an event object for communication between threads if needed
+        shared_event = Event()
 
         #user has logged in: create 2 threads - one for sending, one for receiving
         global threads
-        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username, pill2kill)
+        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username, shared_event)
         threads.append(send_thread)
-        recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), pill2kill)
+        recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), client_username, shared_event)
         threads.append(recv_thread)
 
         #set threads to daemons for auto cleanup on program exit
         send_thread.daemon = True
         recv_thread.daemon = True
+        
         send_thread.start()
         recv_thread.start()
 
@@ -204,7 +206,7 @@ def start_client():
         while True:
             try:
                 send_thread.join()
-                pill2kill.set()
+                #pill2kill.set()
                 recv_thread.join()
 
                 #return to login menu scope

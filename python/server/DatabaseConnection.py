@@ -83,6 +83,27 @@ class DatabaseConn():
             print("LOGIN CHECK ERROR: " + str(e))
             return 0
 
+    
+    def is_registered_user(self, username):
+        try:
+            cursor = self.db_connection.cursor()
+            data = [username]
+            query = "SELECT * FROM Account WHERE username = ?"
+            cursor.execute(query, data)
+            entries_matched = len(cursor.fetchall())
+            #print("Amount of tuples returned: " + str(entries_matched))
+
+            #check that there is exactly one entry matching the desired username
+            if(entries_matched != 1):
+                return 0
+
+            #user retrieved
+            else: return 1
+
+        except Exception as e:
+            print("FIND USER ERROR: " + str(e))
+            return 0
+
 
     def create_Account_table(self):
         #safely check if table is already created before creating it

@@ -17,11 +17,11 @@ Basic ClientSendThread class for the client-side to handle user interface/intera
 
 class ClientSendThread(Thread):
     def __init__(self, socket, address, username, event):    #Inherit from Thread class
-        Thread.__init__(self)
+        self.thread = Thread.__init__(self, args=(event))
         self.sock = socket
         self.addr = address
         self.username = username    #self.username? To determine if the client is logged in, so 'send', etc can be performed
-        self.kill_event = event
+        self.event = event
         self.exception = None
 
 
@@ -92,6 +92,13 @@ class ClientSendThread(Thread):
         self.locked_print("(Send Thread) Connection was closed. Program is exiting gracefully.")
         return
 
+    
+    def serialize_chat_message(self, message, recv_username):
+        #format the message into a server request, then serialize
+        formatted_req = "{'command':'send','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
+        serialized_req = json.dumps(formatted_req).encode()
+        return serialized_req
+
 
     def enter_chat(self, recv_username):
         #retrieve requested user's public key bundle from the server DB
@@ -104,12 +111,42 @@ class ClientSendThread(Thread):
         system('clear')
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
-            connect_req = "{'cmd':'chat','send_username':'%s','recv_username':'%s','message':'Connect with user'}"%(self.username, recv_username)
+            #create sender-side client request
+            connect_req = "{'command':'chat','send_username':'%s','recv_username':'%s','message':'Connect with user'}"%(self.username, recv_username)
             serialized_req = json.dumps(connect_req).encode()
             self.sock.send(serialized_req)
 
         except:
             self.locked_print("There was an issue with sending the chat request...")
+
+        #server handles sending a chat request to the receiver
+        #this function is blocked until the other user accepts the chat request
+        self.event.wait()
+        self.event.clear()
+        
+        #chat message loop
+        while True:
+            try:
+                #get user input for writing a message to the connected user
+                user_message = self.locked_input(":: ")
+
+                if not user_message:
+                    continue
+
+                #check for user exit request
+                if(user_message == '--exit'):
+                    #should notify the server on exit - to be able to notify the other client that user has dropped
+                    self.locked_print("Exiting the chat session...")
+                    break
+
+                #format & serialize the message, then send to server
+                serialized_req = self.serialize_chat_message(user_message, recv_username)
+                self.sock.send(serialized_req)
+                continue
+
+            except:
+                self.locked_print("There was an issue somewhere in the chat...")
+
         return
 
 
@@ -141,7 +178,7 @@ class ClientSendThread(Thread):
                 #first parse the user input string
                 option, recv_user = self.parse_main_menu_input(user_input)
 
-                #handle starting a chat
+                #handle starting a new chat
                 if(option == "--chat"):
                     self.enter_chat(recv_user)
 

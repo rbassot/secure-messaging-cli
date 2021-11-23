@@ -3,6 +3,7 @@
 from socket import *
 from sqlite3 import * #For future database implementation
 
+import config
 from ServerThread import ServerThread
 
 
@@ -10,7 +11,7 @@ from ServerThread import ServerThread
 HOST = '0.0.0.0'    #bind to public IP
 PORT = 50007
 connections = []    #list of all ongoing connections
-users = {}          #dictionary of all connected users
+#users = {}          #dictionary of all connected users
 client_keys = {}    #dictionary of client keys needed for user authorization
 
 
@@ -30,8 +31,10 @@ def start_server():
 
         #handle a connection on a new ClientThread
         print('Connection established to client at address: ', client_addr)
+
+        #spawn a server thread obj dedicated to the client
         ServerThread(client_sock, client_addr)
-        connections.append(client_sock)
+        #config.connections.append(client_sock)
         client_sock.send(b"You are connected from: " + str(client_addr).encode())
 
     #unreachable - how do we gracefully terminate the server? Do we even want to do this?

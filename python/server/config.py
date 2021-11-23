@@ -1,3 +1,3 @@
 #required globals for the program
-connections = []
-authorized_users = []
+connections = {}        #username as index; Socket connection obj as value
+authorized_users = {}
