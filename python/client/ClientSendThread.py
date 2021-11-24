@@ -95,12 +95,13 @@ class ClientSendThread(Thread):
     
     def serialize_chat_message(self, message, recv_username):
         #format the message into a server request, then serialize
-        formatted_req = "{'command':'send','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
+        formatted_req = "{'command':'message_sent','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
         serialized_req = json.dumps(formatted_req).encode()
         return serialized_req
 
 
-    def enter_chat(self, recv_username):
+    #Sender-side chat initialization for the SendThread
+    def request_new_chat(self, recv_username):
         #retrieve requested user's public key bundle from the server DB
         #(sending placeholder message)
         #establish X3DH authentication
@@ -120,39 +121,21 @@ class ClientSendThread(Thread):
             self.locked_print("There was an issue with sending the chat request...")
 
         #server handles sending a chat request to the receiver
-        #this function is blocked until the other user accepts the chat request
+        #blocked until the other user accepts the chat request, and this client's own RecvThread triggers event
         self.event.wait()
         self.event.clear()
         
-        #chat message loop
-        while True:
-            try:
-                #get user input for writing a message to the connected user
-                user_message = self.locked_input(":: ")
+        #TODO: add the failure path - display error message & return to main menu
 
-                if not user_message:
-                    continue
-
-                #check for user exit request
-                if(user_message == '--exit'):
-                    #should notify the server on exit - to be able to notify the other client that user has dropped
-                    self.locked_print("Exiting the chat session...")
-                    break
-
-                #format & serialize the message, then send to server
-                serialized_req = self.serialize_chat_message(user_message, recv_username)
-                self.sock.send(serialized_req)
-                continue
-
-            except:
-                self.locked_print("There was an issue somewhere in the chat...")
+        #sender-side user chat scenario
+        self.join_chat(recv_username)
 
         return
 
 
     def parse_main_menu_input(self, input_str):
         #place arguments into a list
-        args = input_str.split(":")
+        args = input_str.lower().split(":")
 
         #assert that there are only either 1 or 2 arguments
         if(len(args) > 2):
@@ -162,6 +145,37 @@ class ClientSendThread(Thread):
             return args[0], None
 
         return args[0], args[1]
+
+    
+    #generic client handling of a chat
+    def join_chat(self, other_username):
+        self.clear_screen()
+        #sender-side chat message loop
+        while True:
+            try:
+                #get user input for writing a message to the connected user
+                #TODO: may need to avoid input() + use an event to r
+                user_message = self.locked_input(":: ")
+
+                if not user_message:
+                    continue
+
+                #check for user exit request
+                if(user_message == '--exit'):
+                    #should notify the server on exit - to be able to notify the other client that user has dropped
+                    #also must notify the RecvThread that exit was asked for - use a global flag/event?
+                    self.locked_print("Exiting the chat session...")
+                    break
+
+                #format & serialize the message, then send to server
+                serialized_req = self.serialize_chat_message(user_message, other_username)
+                self.sock.send(serialized_req)
+
+                #finally, print the client's own message to its own chat window
+                self.locked_print("You: " + user_message)
+
+            except:
+                self.locked_print("There was an issue somewhere in the chat...")
 
 
     def main_menu(self):
@@ -180,7 +194,7 @@ class ClientSendThread(Thread):
 
                 #handle starting a new chat
                 if(option == "--chat"):
-                    self.enter_chat(recv_user)
+                    self.request_new_chat(recv_user)
 
                 #handle program exit
                 elif(option == "--exit"):
@@ -193,6 +207,14 @@ class ClientSendThread(Thread):
                     #MUST notify the server here to remove client from auth_users + connections lists
                     #self.close_server_conn()
                     return 1
+
+                #Receiver-side chat initialization for the SendThread
+                elif(option == 'y'):
+                    #set event to notify the RecvThread to continue its work
+                    self.event.set()
+
+                    #receiver-side user chat scenario
+                    self.join_chat(config.connected_username)
 
                 else:
                     self.locked_print("Please pass a valid command.")

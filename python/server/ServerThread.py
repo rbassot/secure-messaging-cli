@@ -45,7 +45,7 @@ class ServerThread(Thread):
         #self.sock.send(recv_data)
         response = ""
         if(self.db_conn.is_registered_user(recv_username)): #FIX: also needs to check for recv account activity at the time of the request
-            response = "{'command':'chat_confirmed', 'response':'SUCCESS', 'message':'Successfully connected to ClientB.'}"
+            response = "{'command':'chat_confirmed', 'response':'SUCCESS', 'recv_username':'%s', 'message':'Successfully connected to ClientB.'}"%(recv_username)
 
         else:
             response = "{'command':'chat_confirmed', 'response':'FAILURE', 'message':'Username could not be found!'}"
@@ -153,10 +153,6 @@ class ServerThread(Thread):
             elif(client_req['command'] == 'register'):
                 self.handle_registration(client_req['first'], client_req['last'], client_req['username'], client_req['password'])
 
-            #To implement
-            elif(client_req['command'] == 'send'):
-                self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
-
             #handle client requesting new chat with another user
             # - receive request from client A
             # - ask client B to establish connection
@@ -165,6 +161,11 @@ class ServerThread(Thread):
             elif(client_req['command'] == 'chat'):
                 #Step 1 - receive request from sending client to establish a new chat connection
                 self.handle_new_chat(client_req['send_username'], client_req['recv_username'])
+
+            #basic redirection of a chat message from clientA to clientB
+            #To implement
+            elif(client_req['command'] == 'message_sent'):
+                self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
 
             #Shouldn't need exit handling - returning from the thread above properly cleans it up
             '''elif(client_req['command'] == 'exit'):

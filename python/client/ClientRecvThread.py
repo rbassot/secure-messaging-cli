@@ -54,13 +54,42 @@ class ClientRecvThread(Thread):
         system('clear')
         return
 
+    
+    def join_chat(self, other_username):
+        #listen to the chat and handle incoming messages
+        while True: #test if an event trigger is needed to break out of this loop
+            try:
+                message_data = self.sock.recv(1024).decode()
 
-    def confirm_chat_opened(self, confirm_msg):
+                #chat connection was closed - stop listening
+                if not(message_data):
+                    return
+
+                #parse the message into a dictionary
+                message_json = json.loads(message_data)
+                message_json = ast.literal_eval(message_json)
+
+                #print out the formatted message to the client console
+                if(message_json['message_recv']):
+                    self.locked_print(other_username + ": " + message_json['message'])
+
+            #exit chat on any exception
+            except Exception as e:
+                self.locked_print(str(e))
+                return
+
+
+    #Sender-side chat initialization for the RecvThread
+    def confirm_chat_opened(self, confirm_msg, recv_username):
         self.clear_screen()
         self.locked_print(confirm_msg)
 
         #set the event such that the sender thread can continue
         self.event.set()
+
+        #listen to the new chat
+        #receiver-side user chat scenario
+        self.join_chat(recv_username)
 
         return
 
@@ -71,20 +100,27 @@ class ClientRecvThread(Thread):
         return
 
     
+    #Receiver-side chat initialization for the RecvThread
     #listener thread actually peforms a send here, to establish chat connection
     def accept_chat_req(self, send_username):
-        #ask user if connectin should be established
-        option = self.locked_input("Would you like to enter a chat with " + send_username + " ? Answer Y/N").lower()
-        if(option != 'y'):
-            return
+        #ask user if connecti0n should be established
+        config.connected_username = send_username
+        self.locked_print("Would you like to chat with " + send_username + "? Answer Y/N")
+        
+        #wait on SendThread to accept the request
+        self.event.wait()
 
         #create formatted response string for the server
-        resp_to_connect = "{'command':'accept_chat_req', 'send_username':'%s', 'recv_username':'%s', 'message':'" + str(self.username) + "' has accepted the chat request.}"(send_username, self.username)
+        resp_to_connect = "{'command':'accept_chat_req', 'send_username':'%s', 'recv_username':'%s', 'message':'ClientB has accepted the chat request.'}"%(send_username, self.username)
         serialized_resp = json.dumps(resp_to_connect).encode()
         self.sock.send(serialized_resp)
 
         #set the event such that this client's sender thread can continue
-        #self.event.set()
+        #self.event.set() REMOVE THIS?
+
+        #listen to the new chat
+        #receiver-side user chat scenario
+        self.join_chat(self, send_username)
 
 
     def listen(self):
@@ -103,18 +139,20 @@ class ClientRecvThread(Thread):
 
                 #Enter Chat Part 2 - receive chat request from a sender client
                 if(server_resp['command'] == 'req_chat_from'):
+                    self.clear_screen()
                     self.accept_chat_req(server_resp['send_username'])
 
                 #Enter Chat Part 4 - receive 'new chat' response from a receiver client
                 if(server_resp['command'] == 'chat_confirmed'):
-                    self.confirm_chat_opened(server_resp['message'])
+                    self.confirm_chat_opened(server_resp['message'], server_resp['recv_username'])
 
                 #receive chat estabished confirmation from a receiver client
                 #if(server_resp['command'] == 'req_chat_from'):
 
-                #handle regular message received case
+                #Pretty sure this is unneeded, due to listener thread handling chats in 'join_chat()'
+                '''#handle regular message received case
                 elif(server_resp['command'] == 'message_recv'):
-                    self.print_received_message(server_resp['send_username'], server_resp['message'])
+                    self.print_received_message(server_resp['send_username'], server_resp['message'])'''
 
             except (KeyboardInterrupt, OSError):
                 return 0
