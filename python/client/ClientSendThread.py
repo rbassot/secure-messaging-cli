@@ -4,6 +4,7 @@ from sys import *
 from os import *
 from socket import *
 from threading import *
+from queue import *
 from time import *
 import json
 import ast
@@ -16,12 +17,12 @@ Basic ClientSendThread class for the client-side to handle user interface/intera
 '''
 
 class ClientSendThread(Thread):
-    def __init__(self, socket, address, username, event):    #Inherit from Thread class
-        self.thread = Thread.__init__(self, args=(event))
+    def __init__(self, socket, address, username):    #Inherit from Thread class
+        Thread.__init__(self) #provide a common event for interthread communication between send/receive threads
         self.sock = socket
         self.addr = address
-        self.username = username    #self.username? To determine if the client is logged in, so 'send', etc can be performed
-        self.event = event
+        self.username = username
+        #self.queue = queue
         self.exception = None
 
 
@@ -122,8 +123,9 @@ class ClientSendThread(Thread):
 
         #server handles sending a chat request to the receiver
         #blocked until the other user accepts the chat request, and this client's own RecvThread triggers event
-        self.event.wait()
-        self.event.clear()
+        config.shared_event.wait()
+
+        #self.event.clear()
         
         #TODO: add the failure path - display error message & return to main menu
 
@@ -149,13 +151,13 @@ class ClientSendThread(Thread):
     
     #generic client handling of a chat
     def join_chat(self, other_username):
-        self.clear_screen()
-        #sender-side chat message loop
+        #self.clear_screen()
+        #SendThread chat message loop
         while True:
             try:
                 #get user input for writing a message to the connected user
-                #TODO: may need to avoid input() + use an event to r
-                user_message = self.locked_input(":: ")
+                #TODO: may need to avoid input() + use an event here??
+                user_message = self.locked_input("")
 
                 if not user_message:
                     continue
@@ -172,6 +174,7 @@ class ClientSendThread(Thread):
                 self.sock.send(serialized_req)
 
                 #finally, print the client's own message to its own chat window
+                self.locked_print("\033[A\033[A")
                 self.locked_print("You: " + user_message)
 
             except:
@@ -211,7 +214,11 @@ class ClientSendThread(Thread):
                 #Receiver-side chat initialization for the SendThread
                 elif(option == 'y'):
                     #set event to notify the RecvThread to continue its work
-                    self.event.set()
+                    config.shared_event.set()
+
+                    #wait for the RecvThread to enter the chat first (to display welcome message properly)
+                    config.shared_event.clear()
+                    config.shared_event.wait()
 
                     #receiver-side user chat scenario
                     self.join_chat(config.connected_username)
@@ -234,6 +241,9 @@ class ClientSendThread(Thread):
 
     #Override: continuous execution of the receiver thread
     def run(self):
+        #add this client's username/socket pair to the shared dictionary
+        config.connections.update({self.username: self.sock})
+
         #first encounter with main menu - display options
         self.display_options()
 

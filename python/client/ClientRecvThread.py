@@ -2,8 +2,10 @@
 
 from sys import *
 from os import *
+from time import *
 from socket import *
 from threading import *
+from queue import *
 import json
 import ast
 #from PIL import Image
@@ -15,11 +17,10 @@ Basic ClientRecvThread class for the client-side to continually listen to the se
 '''
 
 class ClientRecvThread(Thread):
-    def __init__(self, socket, address, username, event):    #Inherit from Thread class
-        Thread.__init__(self, args=(event)) #provide a common event for interthread communication between send/receive threads
+    def __init__(self, socket, address, username):    #Inherit from Thread class
+        Thread.__init__(self) #provide a common event for interthread communication between send/receive threads
         self.sock = socket
         self.addr = address
-        self.event = event
         self.username = username
 
     
@@ -56,6 +57,14 @@ class ClientRecvThread(Thread):
 
     
     def join_chat(self, other_username):
+        #initial chat welcoming
+        self.locked_print("Now chatting with " + str(other_username) + ".")
+        self.locked_print("")
+
+        #allow the SendThread to enter the chat
+        config.shared_event.set()
+        config.shared_event.clear()
+
         #listen to the chat and handle incoming messages
         while True: #test if an event trigger is needed to break out of this loop
             try:
@@ -70,8 +79,9 @@ class ClientRecvThread(Thread):
                 message_json = ast.literal_eval(message_json)
 
                 #print out the formatted message to the client console
-                if(message_json['message_recv']):
-                    self.locked_print(other_username + ": " + message_json['message'])
+                if(message_json['command'] == 'message_recv'):
+                    message_str = str(other_username) + ": " + str(message_json['message'])
+                    self.locked_print('\033[94m' + message_str + '\033[0m')
 
             #exit chat on any exception
             except Exception as e:
@@ -83,9 +93,10 @@ class ClientRecvThread(Thread):
     def confirm_chat_opened(self, confirm_msg, recv_username):
         self.clear_screen()
         self.locked_print(confirm_msg)
+        sleep(1)
 
         #set the event such that the sender thread can continue
-        self.event.set()
+        config.shared_event.set()
 
         #listen to the new chat
         #receiver-side user chat scenario
@@ -108,10 +119,9 @@ class ClientRecvThread(Thread):
         self.locked_print("Would you like to chat with " + send_username + "? Answer Y/N")
         
         #wait on SendThread to accept the request
-        self.event.wait()
-
+        config.shared_event.wait()
         #create formatted response string for the server
-        resp_to_connect = "{'command':'accept_chat_req', 'send_username':'%s', 'recv_username':'%s', 'message':'ClientB has accepted the chat request.'}"%(send_username, self.username)
+        resp_to_connect = "{'command':'accept_chat_req', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, self.username)
         serialized_resp = json.dumps(resp_to_connect).encode()
         self.sock.send(serialized_resp)
 
@@ -120,7 +130,10 @@ class ClientRecvThread(Thread):
 
         #listen to the new chat
         #receiver-side user chat scenario
-        self.join_chat(self, send_username)
+        self.clear_screen()
+        self.locked_print("You accepted to join the chat.")
+        sleep(1)
+        self.join_chat(send_username)
 
 
     def listen(self):
@@ -142,7 +155,7 @@ class ClientRecvThread(Thread):
                     self.clear_screen()
                     self.accept_chat_req(server_resp['send_username'])
 
-                #Enter Chat Part 4 - receive 'new chat' response from a receiver client
+                #Enter Chat Part 6 - receive 'new chat' response from a receiver client
                 if(server_resp['command'] == 'chat_confirmed'):
                     self.confirm_chat_opened(server_resp['message'], server_resp['recv_username'])
 

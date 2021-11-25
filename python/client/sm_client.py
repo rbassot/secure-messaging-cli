@@ -3,11 +3,14 @@
 from sys import *
 from socket import *
 from threading import *
+from queue import *
 from sqlite3 import * #For future database implementation
 from os import *
 from time import *
 import json
 import ast
+
+import config
 
 from ClientSendThread import ClientSendThread
 from ClientRecvThread import ClientRecvThread
@@ -185,19 +188,18 @@ def start_client():
         if(not login_or_register()):
             break
 
-        #create an event object for communication between threads if needed
-        shared_event = Event()
+        #shared_queue = Queue()
 
         #user has logged in: create 2 threads - one for sending, one for receiving
         global threads
-        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username, shared_event)
+        send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
         threads.append(send_thread)
-        recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), client_username, shared_event)
+        recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
         threads.append(recv_thread)
 
         #set threads to daemons for auto cleanup on program exit
-        send_thread.daemon = True
-        recv_thread.daemon = True
+        #send_thread.daemon = True
+        #recv_thread.daemon = True
         
         send_thread.start()
         recv_thread.start()

@@ -28,19 +28,49 @@ class ServerThread(Thread):
     def handle_new_chat(self, send_username, recv_username):
         #Step 2 - send a request to the receiving client to establish connection
         req_to_connect = "{'command':'req_chat_from', 'response':'SUCCESS', 'send_username':'%s', 'message':'ClientA has requested to chat!'}"%(send_username)
+        print("Step2: " + req_to_connect)
         serialized_req = json.dumps(req_to_connect).encode()
-        recv_socket = config.connections.get(str(recv_username))
-        recv_socket.send(serialized_req)
+        receiver_socket = config.connections.get(str(recv_username))
+        receiver_socket.send(serialized_req)
 
+        #Step 3 - block this ServerThread A until the receiving client responds to ServerThreadB
+        config.shared_event.wait()
+
+        #MOVE TO SERVERTHREAD B SIDE
+        '''
         #Step 3 - receive response from the receiver-side client & parse it
-        recv_data = recv_socket.recv(1024)
+        recv_data = receiver_socket.recv(1024)
         recv_response = json.loads(recv_data.decode())
         recv_response = ast.literal_eval(recv_response)
+        serv1_socket = recv_response['serv_socket']
+        print("Step4: " + recv_response)
 
+        #FIX: assert that the received response from receiver-side client was a correct response
         if(recv_response['command'] != 'accept_chat_req' or recv_response['recv_username'] != recv_username):
             print("Error establishing the connection!")
             return
+        '''
 
+        #Step 6 - notify the sender client that the receiver confirmed the chat req
+        sender_conn_confirm = "{'command':'chat_confirmed', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, recv_username)
+        serialized_confirm = json.dumps(sender_conn_confirm).encode()
+
+        #confirm with the sender client that the connection is established
+        self.sock.send(serialized_confirm)
+
+        #Finally return to listener scope to to wait for messages from the sender-side client
+        return
+
+
+    def accept_chat_request(self):
+        #Step 5 - notify ServerThread A that the receiver's response was received
+        config.shared_event.set()
+
+        #Finally return to listener scope to wait for messages from the receiver-side client
+        return
+
+    
+    def confirm_new_chat(self, send_username, recv_username):
         #Step 4 - forward response to the sender-side client
         #self.sock.send(recv_data)
         response = ""
@@ -50,6 +80,7 @@ class ServerThread(Thread):
         else:
             response = "{'command':'chat_confirmed', 'response':'FAILURE', 'message':'Username could not be found!'}"
 
+        print("This is the response to confirm on the sender-side: " + response)
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
 
@@ -140,7 +171,7 @@ class ServerThread(Thread):
 
             #print(isinstance(client_req, dict))
             print(client_req)
-            print("Client sent request for: " + client_req['command'])
+            print("Client sent request to " + current_thread().name + " for: " + client_req['command'])
 
             #handle various client requests
             if(client_req['command'] == 'login'):
@@ -153,14 +184,21 @@ class ServerThread(Thread):
             elif(client_req['command'] == 'register'):
                 self.handle_registration(client_req['first'], client_req['last'], client_req['username'], client_req['password'])
 
-            #handle client requesting new chat with another user
-            # - receive request from client A
-            # - ask client B to establish connection
-            # - receive response from client B
-            # - notify client A that the request was accepted & connection can be established
+            #handle client requesting new chat with another user:
+            # 1 - receive request from client A (on ServerThread A)
+            # 2 - ask client B to establish connection (from ServerThread A)
+            # 3 - BLOCK ServerThread A on event, until ServerThread B triggers it
+            # 4 - receive response from client B (on ServerThread B)
+            # 5 - trigger the event from ServerThread B to notify ServerThread A to continue
+            # 6 - notify client A that the request was accepted & connection can be established (from ServerThread A)
             elif(client_req['command'] == 'chat'):
                 #Step 1 - receive request from sending client to establish a new chat connection
+                print("Entering handle_new_chat()")
                 self.handle_new_chat(client_req['send_username'], client_req['recv_username'])
+
+            #Step 4 - receive response from the receiver client (on ServerThread B)
+            elif(client_req['command'] == 'accept_chat_req'):
+                self.accept_chat_request()
 
             #basic redirection of a chat message from clientA to clientB
             #To implement

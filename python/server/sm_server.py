@@ -30,7 +30,7 @@ def start_server():
         client_sock, client_addr = sock.accept()
 
         #handle a connection on a new ClientThread
-        print('Connection established to client at address: ', client_addr)
+        print('Connection established to client at address: ' + str(client_addr))
 
         #spawn a server thread obj dedicated to the client
         ServerThread(client_sock, client_addr)
