@@ -100,7 +100,10 @@ class ServerThread(Thread):
         forwarded_msg = "{'command':'message_recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
         serialized_msg = json.dumps(forwarded_msg).encode()
 
-        #TODO: Store the encrypted message twice (forward, reverse) in the DB's Message table
+        #store the encrypted message once in the DB's Message table
+        if(not self.db_conn.insert_new_message(send_client, recv_client, encr_message)):
+            print("Error with storing the message to the DB!")
+            return
 
         #send to the correct receiving client via its socket connection
         recv_socket = config.connections.get(str(recv_client))
@@ -146,6 +149,24 @@ class ServerThread(Thread):
         print(response)
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
+        return
+
+
+    def retrieve_history(self, this_username, other_username):
+        #retrieve all messages from the DB for this users conversation history with specific client
+        messages = self.db_conn.get_message_history(this_username, other_username)
+        if(not messages):
+            print("Error retrieving message history!")
+            return
+
+        print(messages)
+        print("First message: " + str(messages[0]))
+        #send the list of messages back over to the client
+        #**TODO: properly pass the message list in a way that quotes are escaped!!**
+        history_resp = '''{"command":"history", "response":"SUCCESS", "message_list":"%s", "other_username":"%s", "message":"Successfully retrieved conversation history."}'''%(messages, other_username)
+        serialized_resp = json.dumps(history_resp).encode()
+        self.sock.send(serialized_resp)
+        return
 
 
     def new_connection(self):
@@ -205,6 +226,10 @@ class ServerThread(Thread):
             elif(client_req['command'] == 'message_sent'):
                 self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
 
+            #handle client requesting conversation history with a specific user
+            elif(client_req['command'] == 'history'):
+                self.retrieve_history(client_req['my_username'], client_req['other_username'])
+            
             #Shouldn't need exit handling - returning from the thread above properly cleans it up
             '''elif(client_req['command'] == 'exit'):
                 self.close_client_connection()'''

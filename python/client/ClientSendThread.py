@@ -179,6 +179,22 @@ class ClientSendThread(Thread):
 
             except:
                 self.locked_print("There was an issue somewhere in the chat...")
+        return
+
+
+    def request_history(self, other_username):
+        #ask the server to retrieve conversation history
+        try:
+            req_conversation = "{'command':'history','my_username':'%s','other_username':'%s','message':'Retrieve conversation history'}"%(self.username, other_username)
+            serialized_req = json.dumps(req_conversation).encode()
+            self.sock.send(serialized_req)
+
+            #probably block the sender thread here until the RecvThread prints out full convo history?
+            config.shared_event.wait()
+
+        except:
+            self.locked_print("There was an issue with sending the history request...")
+        return
 
 
     def main_menu(self):
@@ -210,6 +226,10 @@ class ClientSendThread(Thread):
                     #MUST notify the server here to remove client from auth_users + connections lists
                     #self.close_server_conn()
                     return 1
+
+                #handle user retrieving conversation history
+                elif(option == "--history"):
+                    self.request_history(recv_user)
 
                 #Receiver-side chat initialization for the SendThread
                 elif(option == 'y'):

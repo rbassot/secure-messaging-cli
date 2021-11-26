@@ -33,15 +33,15 @@ class DatabaseConn():
     def get_Message_row_count(self):
         cursor = self.db_connection.cursor()
         query = "SELECT COUNT(*) FROM Message"
-        return int(cursor.execute(query))
-
+        cursor.execute(query)
+        count = int(cursor.fetchone()[0])
+        return count
 
     def insert_new_account(self, first_name, last_name, username, password):
         #get row count for ID field
         try:
             cursor = self.db_connection.cursor()
             row_count = self.get_Account_row_count()
-            print(row_count)
             data = [row_count + 1, first_name, last_name, username, password]
             query = "INSERT INTO Account(id, first_name, last_name, username, password) VALUES(?, ?, ?, ?, ?)"
             cursor.execute(query, data)
@@ -49,18 +49,33 @@ class DatabaseConn():
             return 1
         
         except Exception as e:
-            print("INSERT ERROR: " + str(e))
+            print("INSERT ACCOUNT ERROR: " + str(e))
             return 0
 
 
     def insert_new_message(self, send_username, recv_username, encr_message):
         #get row count for ID field
+        try:
+            cursor = self.db_connection.cursor()
+            row_count = self.get_Message_row_count()
+            data = [row_count + 1, send_username, recv_username, encr_message]
+            query = "INSERT INTO Message(id, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?)"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+
+        except Exception as e:
+            print("INSERT MESSAGE ERROR: " + str(e))
+            return 0
+
+
+    def get_message_history(self, send_username, recv_username):
         cursor = self.db_connection.cursor()
-        row_count = self.get_Message_row_count()
-        data = [row_count + 1, send_username, recv_username, encr_message]
-        query = "INSERT INTO Message... VALUES(?, ?, ?, ?)"
+        data = [send_username, recv_username]
+        query = "SELECT * FROM 'Message' WHERE send_username IN (?, ?)"
         cursor.execute(query, data)
-        self.db_connection.commit()
+        messages = cursor.fetchall()
+        return messages
 
 
     def is_valid_username_password(self, username, password):

@@ -78,7 +78,7 @@ class ClientRecvThread(Thread):
                 message_json = json.loads(message_data)
                 message_json = ast.literal_eval(message_json)
 
-                #print out the formatted message to the client console
+                #print out the formatted message in blue to the client console
                 if(message_json['command'] == 'message_recv'):
                     message_str = str(other_username) + ": " + str(message_json['message'])
                     self.locked_print('\033[94m' + message_str + '\033[0m')
@@ -114,7 +114,7 @@ class ClientRecvThread(Thread):
     #Receiver-side chat initialization for the RecvThread
     #listener thread actually peforms a send here, to establish chat connection
     def accept_chat_req(self, send_username):
-        #ask user if connecti0n should be established
+        #ask user if connection should be established
         config.connected_username = send_username
         self.locked_print("Would you like to chat with " + send_username + "? Answer Y/N")
         
@@ -134,6 +134,40 @@ class ClientRecvThread(Thread):
         self.locked_print("You accepted to join the chat.")
         sleep(1)
         self.join_chat(send_username)
+
+
+    def format_message_history(self, other_username, message_list):
+        #format each message list and print to client screen
+        self.locked_print("")
+        self.locked_print("--- Conversation history with " + str(other_username) + ": ---")
+        for row in message_list:
+            try:
+                #***must handle decrypting the sent messages from the server prior to printing***
+                #self.locked_print(row)
+                encr_message = str(row[3])
+                #self.locked_print(encr_message)
+                #decrypt...
+                message = encr_message
+
+                #own messages to the other client
+                if(str(row[1]) == self.username):
+                    self.locked_print("You: " + message)
+
+                #own messages to the other client
+                elif(str(row[1]) == other_username):
+                    message_str = other_username + ": " + message
+                    self.locked_print('\033[94m' + message_str + '\033[0m')
+
+            except Exception as e:
+                print(e)
+                return
+
+        self.locked_print("")
+        
+        #release the SendThread to ask for input again
+        config.shared_event.set()
+        config.shared_event.clear()
+        return
 
 
     def listen(self):
@@ -156,8 +190,14 @@ class ClientRecvThread(Thread):
                     self.accept_chat_req(server_resp['send_username'])
 
                 #Enter Chat Part 6 - receive 'new chat' response from a receiver client
-                if(server_resp['command'] == 'chat_confirmed'):
+                elif(server_resp['command'] == 'chat_confirmed'):
                     self.confirm_chat_opened(server_resp['message'], server_resp['recv_username'])
+
+                #handle receiving conversation history from the server
+                elif(server_resp['command'] == 'history'):
+                    #destringify the message list back into a list - apply literal_eval again
+                    message_list = ast.literal_eval(server_resp['message_list'])
+                    self.format_message_history(server_resp['other_username'], message_list)
 
                 #receive chat estabished confirmation from a receiver client
                 #if(server_resp['command'] == 'req_chat_from'):
@@ -168,6 +208,10 @@ class ClientRecvThread(Thread):
                     self.print_received_message(server_resp['send_username'], server_resp['message'])'''
 
             except (KeyboardInterrupt, OSError):
+                return 0
+
+            except Exception as e:
+                print(e)
                 return 0
 
 
