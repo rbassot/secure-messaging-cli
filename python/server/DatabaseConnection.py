@@ -53,13 +53,13 @@ class DatabaseConn():
             return 0
 
 
-    def insert_new_message(self, send_username, recv_username, encr_message):
+    def insert_new_message(self, owner_username, send_username, recv_username, encr_message):
         #get row count for ID field
         try:
             cursor = self.db_connection.cursor()
             row_count = self.get_Message_row_count()
-            data = [row_count + 1, send_username, recv_username, encr_message]
-            query = "INSERT INTO Message(id, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?)"
+            data = [row_count + 1, owner_username, send_username, recv_username, encr_message]
+            query = "INSERT INTO Message(id, owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?, ?)"
             cursor.execute(query, data)
             self.db_connection.commit()
             return 1
@@ -71,11 +71,16 @@ class DatabaseConn():
 
     def get_message_history(self, send_username, recv_username):
         cursor = self.db_connection.cursor()
-        data = [send_username, recv_username]
-        query = "SELECT * FROM 'Message' WHERE send_username IN (?, ?)"
+        data = [send_username]
+        query = "SELECT * FROM 'Message' WHERE owned_username LIKE ?"
         cursor.execute(query, data)
         messages = cursor.fetchall()
         return messages
+
+
+    def delete_message_history(self, owner_username, other_username):
+        cursor = self.db_connection.cursor()
+        pass
 
 
     def is_valid_username_password(self, username, password):
@@ -139,6 +144,7 @@ class DatabaseConn():
         cursor = self.db_connection.cursor()
         query = '''CREATE TABLE IF NOT EXISTS Message(
                     id INTEGER NOT NULL PRIMARY KEY,
+                    owned_username TEXT NOT NULL,
                     send_username TEXT NOT NULL,
                     recv_username TEXT NOT NULL,
                     encr_message TEXT)

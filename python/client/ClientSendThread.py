@@ -211,8 +211,13 @@ class ClientSendThread(Thread):
                 #first parse the user input string
                 option, recv_user = self.parse_main_menu_input(user_input)
 
+                #display options to user
+                if(option == "--options"):
+                    self.clear_screen()
+                    self.display_options()
+
                 #handle starting a new chat
-                if(option == "--chat"):
+                elif(option == "--chat"):
                     self.request_new_chat(recv_user)
 
                 #handle program exit

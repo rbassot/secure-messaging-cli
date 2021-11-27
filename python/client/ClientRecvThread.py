@@ -138,6 +138,7 @@ class ClientRecvThread(Thread):
 
     def format_message_history(self, other_username, message_list):
         #format each message list and print to client screen
+        self.clear_screen()
         self.locked_print("")
         self.locked_print("--- Conversation history with " + str(other_username) + ": ---")
         for row in message_list:
@@ -149,12 +150,12 @@ class ClientRecvThread(Thread):
                 #decrypt...
                 message = encr_message
 
-                #own messages to the other client
-                if(str(row[1]) == self.username):
+                #own messages to the other client (outgoing)
+                if(str(row[2]) == self.username):
                     self.locked_print("You: " + message)
 
-                #own messages to the other client
-                elif(str(row[1]) == other_username):
+                #own messages from the other client (incoming)
+                elif(str(row[2]) == other_username):
                     message_str = other_username + ": " + message
                     self.locked_print('\033[94m' + message_str + '\033[0m')
 

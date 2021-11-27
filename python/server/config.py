@@ -7,4 +7,3 @@ authorized_users = {}
 #event object such that two ServerThreads can synchronize with eachother (for chat establishment)
 shared_event = Event()
 shared_event.clear()
-

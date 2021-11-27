@@ -100,8 +100,12 @@ class ServerThread(Thread):
         forwarded_msg = "{'command':'message_recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
         serialized_msg = json.dumps(forwarded_msg).encode()
 
-        #store the encrypted message once in the DB's Message table
-        if(not self.db_conn.insert_new_message(send_client, recv_client, encr_message)):
+        #store the encrypted message once in the DB's Message table twice - once for each owner of the message, for separate histories
+        try:
+            self.db_conn.insert_new_message(send_client, send_client, recv_client, encr_message)
+            self.db_conn.insert_new_message(recv_client, send_client, recv_client, encr_message)
+
+        except:
             print("Error with storing the message to the DB!")
             return
 
