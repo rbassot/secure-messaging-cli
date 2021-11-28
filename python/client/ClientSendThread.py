@@ -170,6 +170,7 @@ class ClientSendThread(Thread):
                     break
 
                 #format & serialize the message, then send to server
+                #encryption step?
                 serialized_req = self.serialize_chat_message(user_message, other_username)
                 self.sock.send(serialized_req)
 
