@@ -65,6 +65,7 @@ class ServerThread(Thread):
     def accept_chat_request(self):
         #Step 5 - notify ServerThread A that the receiver's response was received
         config.shared_event.set()
+        config.shared_event.clear()
 
         #Finally return to listener scope to wait for messages from the receiver-side client
         return
@@ -160,15 +161,24 @@ class ServerThread(Thread):
         #retrieve all messages from the DB for this users conversation history with specific client
         messages = self.db_conn.get_message_history(this_username, other_username)
         if(not messages):
-            print("Error retrieving message history!")
-            return
+            print("There were no messages in the client's history!")
 
-        print(messages)
-        print("First message: " + str(messages[0]))
-        #send the list of messages back over to the client
-        #**TODO: properly pass the message list in a way that quotes are escaped!!**
+        #send the list of messages (could be empty!) back over to the client
         history_resp = '''{"command":"history", "response":"SUCCESS", "message_list":"%s", "other_username":"%s", "message":"Successfully retrieved conversation history."}'''%(messages, other_username)
         serialized_resp = json.dumps(history_resp).encode()
+        self.sock.send(serialized_resp)
+        return
+
+
+    def delete_history(self, this_username, other_username):
+        #delete all messages corresponding to the user's history with the specified client
+        if(not self.db_conn.delete_message_history(this_username, other_username)):
+            print("Error deleting message history!")
+            return
+
+        #send confirmation of deletion back to the client
+        del_history_resp = "{'command':'delete-history', 'response':'SUCCESS', 'message':'Successfully deleted your conversation history with %s.'}"%(other_username)
+        serialized_resp = json.dumps(del_history_resp).encode()
         self.sock.send(serialized_resp)
         return
 
@@ -233,6 +243,10 @@ class ServerThread(Thread):
             #handle client requesting conversation history with a specific user
             elif(client_req['command'] == 'history'):
                 self.retrieve_history(client_req['my_username'], client_req['other_username'])
+
+            #handle deleting the client's history from the database
+            elif(client_req['command'] == 'delete-history'):
+                self.delete_history(client_req['my_username'], client_req['other_username'])
             
             #Shouldn't need exit handling - returning from the thread above properly cleans it up
             '''elif(client_req['command'] == 'exit'):

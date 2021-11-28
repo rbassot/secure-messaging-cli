@@ -188,8 +188,6 @@ def start_client():
         if(not login_or_register()):
             break
 
-        #shared_queue = Queue()
-
         #user has logged in: create 2 threads - one for sending, one for receiving
         global threads
         send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
@@ -198,8 +196,8 @@ def start_client():
         threads.append(recv_thread)
 
         #set threads to daemons for auto cleanup on program exit
-        #send_thread.daemon = True
-        #recv_thread.daemon = True
+        send_thread.daemon = True
+        recv_thread.daemon = True
         
         send_thread.start()
         recv_thread.start()

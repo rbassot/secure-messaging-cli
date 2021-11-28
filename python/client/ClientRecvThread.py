@@ -97,6 +97,7 @@ class ClientRecvThread(Thread):
 
         #set the event such that the sender thread can continue
         config.shared_event.set()
+        config.shared_event.clear()
 
         #listen to the new chat
         #receiver-side user chat scenario
@@ -160,7 +161,7 @@ class ClientRecvThread(Thread):
                     self.locked_print('\033[94m' + message_str + '\033[0m')
 
             except Exception as e:
-                print(e)
+                self.locked_print(e)
                 return
 
         self.locked_print("")
@@ -183,7 +184,9 @@ class ClientRecvThread(Thread):
                 #parse the server's message into a dictionary
                 server_resp = json.loads(server_data)
                 server_resp = ast.literal_eval(server_resp)
-                self.locked_print("Server response type: " + str(server_resp['response']))
+
+                #check server response type for state of the response
+                #self.locked_print("Server response type: " + str(server_resp['response']))
 
                 #Enter Chat Part 2 - receive chat request from a sender client
                 if(server_resp['command'] == 'req_chat_from'):
@@ -198,25 +201,29 @@ class ClientRecvThread(Thread):
                 elif(server_resp['command'] == 'history'):
                     #destringify the message list back into a list - apply literal_eval again
                     message_list = ast.literal_eval(server_resp['message_list'])
-                    self.format_message_history(server_resp['other_username'], message_list)
+                    if message_list:
+                        self.format_message_history(server_resp['other_username'], message_list)
+                    else:
+                        self.locked_print("")
+                        self.locked_print("There is no message history with " + server_resp['other_username'] + " to be displayed.")
 
-                #receive chat estabished confirmation from a receiver client
-                #if(server_resp['command'] == 'req_chat_from'):
+                        #release the SendThread to ask for input again
+                        config.shared_event.set()
+                        config.shared_event.clear()
 
-                #Pretty sure this is unneeded, due to listener thread handling chats in 'join_chat()'
-                '''#handle regular message received case
-                elif(server_resp['command'] == 'message_recv'):
-                    self.print_received_message(server_resp['send_username'], server_resp['message'])'''
+                #handle deleting conversation history with a specific client from the server
+                elif(server_resp['command'] == 'delete-history'):
+                    self.locked_print(server_resp['message'])
+                    config.shared_event.set()
+                    config.shared_event.clear()
 
-            except (KeyboardInterrupt, OSError):
-                return 0
-
+            #exit on any exception type
             except Exception as e:
-                print(e)
+                self.locked_print(e)
                 return 0
 
 
-    #continuous execution of the receiver thread - function override
+    #Override: continuous execution of the receiver thread
     def run(self):
         self.listen()
         return

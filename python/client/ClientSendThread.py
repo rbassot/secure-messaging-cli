@@ -163,7 +163,7 @@ class ClientSendThread(Thread):
                     continue
 
                 #check for user exit request
-                if(user_message == '--exit'):
+                if(user_message in ('--quit', '--quit-chat')):
                     #should notify the server on exit - to be able to notify the other client that user has dropped
                     #also must notify the RecvThread that exit was asked for - use a global flag/event?
                     self.locked_print("Exiting the chat session...")
@@ -185,15 +185,30 @@ class ClientSendThread(Thread):
     def request_history(self, other_username):
         #ask the server to retrieve conversation history
         try:
-            req_conversation = "{'command':'history','my_username':'%s','other_username':'%s','message':'Retrieve conversation history'}"%(self.username, other_username)
+            req_conversation = "{'command':'history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
             serialized_req = json.dumps(req_conversation).encode()
             self.sock.send(serialized_req)
 
-            #probably block the sender thread here until the RecvThread prints out full convo history?
+            #blocks the sender thread here until the RecvThread prints out full convo history
             config.shared_event.wait()
 
         except:
             self.locked_print("There was an issue with sending the history request...")
+        return
+
+
+    def request_delete_history(self, other_username):
+        #ask the server to delete conversation history with a specific user
+        try:
+            req_conversation = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
+            serialized_req = json.dumps(req_conversation).encode()
+            self.sock.send(serialized_req)
+
+            #blocks the sender thread here until the RecvThread prints out confirmation of deletion
+            config.shared_event.wait()
+
+        except:
+            self.locked_print("There was an issue with deleting the history...")
         return
 
 
@@ -236,6 +251,10 @@ class ClientSendThread(Thread):
                 elif(option == "--history"):
                     self.request_history(recv_user)
 
+                #handle user retrieving conversation history
+                elif(option == "--delete-history"):
+                    self.request_delete_history(recv_user)
+
                 #Receiver-side chat initialization for the SendThread
                 elif(option == 'y'):
                     #set event to notify the RecvThread to continue its work
@@ -264,7 +283,7 @@ class ClientSendThread(Thread):
                 return 0
 
 
-    #Override: continuous execution of the receiver thread
+    #Override: continuous execution of the sender thread
     def run(self):
         #add this client's username/socket pair to the shared dictionary
         config.connections.update({self.username: self.sock})

@@ -78,9 +78,19 @@ class DatabaseConn():
         return messages
 
 
-    def delete_message_history(self, owner_username, other_username):
-        cursor = self.db_connection.cursor()
-        pass
+    #deletes the converssation history for the requester's side only
+    def delete_message_history(self, req_username, other_username):
+        try:
+            cursor = self.db_connection.cursor()
+            data = [req_username, other_username, other_username]
+            query = "DELETE FROM Message WHERE owned_username LIKE ? AND (send_username LIKE ? OR recv_username LIKE ?)"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+
+        except Exception as e:
+            print("DELETE HISTORY ERROR: " + str(e))
+            return 0
 
 
     def is_valid_username_password(self, username, password):
