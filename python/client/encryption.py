@@ -1,0 +1,372 @@
+#!usr/bin/env python3
+
+import os
+import time
+import json
+import sys
+sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\secure_message\\enc_branch\\seng360-a3\\python')
+
+from cryptography.hazmat.primitives.asymmetric import x25519
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+from cryptography.exceptions import InvalidSignature
+from server.DatabaseImpl import DatabaseConn
+
+MAX_ONE_TIME_PREKEY = 100   # Num of one-time prekeys stored in server
+
+# HKDF Specs - See https://signal.org/docs/specifications/x3dh/#cryptographic-notation
+HKDF_F = b'\0xff' * 32
+HKDF_LEN = 32
+HKDF_SALT = b'\0' * HKDF_LEN
+server = DatabaseConn()
+
+class User():
+
+    def __init__(self, username):
+        self.username = username
+        self.key_bundles = {}   # Stores "recent" contacts' key bundles
+
+        self.secret_IK = x25519.X25519PrivateKey.generate()
+        self.public_IK = self.secret_IK.public_key()
+        
+        self.secret_ED = ed25519.Ed25519PrivateKey.generate()
+        self.public_ED = self.secret_ED.public_key()
+        
+        self.secret_SPK = x25519.X25519PrivateKey.generate()
+        self.public_SPK = self.secret_SPK.public_key()
+
+        self.Signature = self.secret_ED.sign(self.get_bytes(self.public_SPK, False))
+        
+        self.secret_OTPK = []
+        self.public_OTPK = []
+
+        # Change to MAX_ONE_TIME_PREKEY
+        for i in range(5):
+            secret_key = x25519.X25519PrivateKey.generate()
+            public_key = secret_key.public_key()
+
+            self.secret_OTPK.append((secret_key, public_key))
+            self.public_OTPK.append(public_key)
+
+            # Convert Public OTPK into bytes and send to server
+            self.public_OTPK_bytes = self.get_bytes(public_key, False)
+            server.create_OTPK_table()
+            server.insert_OTKP(self.username, self.public_OTPK_bytes)
+        
+        self.publish_key_bundle()
+
+
+    def publish_key_bundle(self):
+        '''
+        Send public keys to server.
+        '''
+        server.create_KeyBundle_table()
+
+        server.insert_KeyBundle(
+            self.username,
+            self.get_bytes(self.public_IK, False),
+            self.get_bytes(self.public_ED, False),
+            self.get_bytes(self.public_SPK, False),
+            self.Signature
+        )
+
+    def send_msg(self, receiver, message):
+        
+        # Get receiver's key bundle
+            # get_key_bundle will add receiver to self.key_bundles[receiver]
+            # access data via self.key_bundles[receiver][X], data = Object, not bytes
+        if self.get_key_bundle(receiver) is False:
+            print("Could not retreive <", receiver, "> key bundle")
+            return
+
+        recv_key_bundle = self.key_bundles[receiver]
+
+        # Verify Signed Prekeys
+        try:
+            SPK_bytes = self.get_bytes(recv_key_bundle['SPK'], False)
+            recv_key_bundle['ED'].verify(recv_key_bundle['Signature'], SPK_bytes)
+        except InvalidSignature:
+            print("Signature verification failed.")
+
+        # Calculate key material
+        key_material = self.X3DH(receiver)
+
+        # Calculate shared key
+        shared_key = self.calc_sk(key_material)
+
+        # Generate key combination
+        key_combination = self.gen_key_combination(receiver)
+
+        # Build msg
+        msg_contents = json.dumps({
+            'from': self.username,
+            'to': receiver,
+            'msg': message
+        }).encode('utf-8')
+
+        # Sign msg and key combination
+        signature = self.secret_ED.sign(key_combination + msg_contents)
+
+        # Build payload
+        sender_IK_bytes = self.get_bytes(self.public_IK, False)
+        recv_IK_bytes = self.get_bytes(recv_key_bundle['IK'], False)
+
+        payload = signature + sender_IK_bytes + recv_IK_bytes + msg_contents
+
+        # Encrypt payload
+        AESGCM_KEY = AESGCM(shared_key)
+        nonce = os.urandom(12)
+        ciphertext = AESGCM_KEY.encrypt(nonce=nonce, data=payload, associated_data=None)
+        tag = ciphertext[-16:]
+
+        # Build final msg to be sent
+        global msg_sent
+        msg_sent = key_combination + nonce + tag + ciphertext
+
+        # print()
+        # print("     Message Sent:   ", message)
+        # print()
+
+        return
+
+
+
+    def calc_sk(self, key_material) -> bytes:
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=HKDF_LEN,
+            salt=HKDF_SALT,
+            info=None,
+        )
+        shared_key = hkdf.derive(key_material)
+
+        return shared_key
+
+    def gen_key_combination(self, receiver) -> bytes:
+        '''
+        Generates key combination; sender_IK + sender_EK + recv_OTPK
+        '''
+        recv_key_bundle = self.key_bundles[receiver]
+
+        sender_IK_bytes = self.get_bytes(self.public_IK, False)
+        # recv_IK_bytes = self.get_bytes(recv_key_bundle['IK'], False)
+        sender_EK_bytes = self.get_bytes(recv_key_bundle['public_EK'], False)
+        recv_OTPK_bytes = self.get_bytes(recv_key_bundle['OTPK'], False)
+
+        key_combination = sender_IK_bytes + sender_EK_bytes + recv_OTPK_bytes
+
+        return key_combination
+    
+
+    def X3DH(self, receiver) -> bytes:
+        '''
+        Applies Extended Triple Diffie-Hellman and returns key meterial
+        '''
+
+        recv_key_bundle = self.key_bundles[receiver]
+        
+        # verify prekey signature
+        try:
+            SPK_bytes = self.get_bytes(recv_key_bundle['SPK'], False)
+            recv_key_bundle['ED'].verify(recv_key_bundle['Signature'], SPK_bytes)
+        except InvalidSignature as e:
+            print(e)
+            return
+
+        # generate Ephemeral Keys
+        secret_key = x25519.X25519PrivateKey.generate()
+        public_key = secret_key.public_key()
+
+        self.key_bundles[receiver]['secret_EK'] = secret_key
+        self.key_bundles[receiver]['public_EK'] = public_key
+
+        # calculate key material
+        DH1 = self.secret_IK.exchange(recv_key_bundle['SPK'])
+        DH2 = recv_key_bundle['secret_EK'].exchange(recv_key_bundle['IK'])
+        DH3 = recv_key_bundle['secret_EK'].exchange(recv_key_bundle['SPK'])
+        DH4 = recv_key_bundle['secret_EK'].exchange(recv_key_bundle['OTPK'])
+
+        key_material = HKDF_F + DH1 + DH2 + DH3 + DH4
+        # TODO: DELETE secret_EK + DH results after calculating key material
+
+        return key_material
+
+
+    def recv_msg(self, sender):
+        # TODO - Implement get_msg()
+        
+        # indexes to find information in msg
+        IK_FIN = 32
+        EK_FIN = 64
+        OTPK_FIN = 96
+        NONCE_FIN = OTPK_FIN + 12
+        TAG_FIN = NONCE_FIN + 16
+
+        # change this to actual msg
+        msg = msg_sent
+        
+        # retrive sender's key bundle from server
+        sender_key_bundle = None
+        if self.get_key_bundle(sender) is False:
+            print("Could not retreive <", sender, "> key bundle")
+        
+        sender_key_bundle = self.key_bundles[sender]
+        
+        # retrive sender's key bundle from msg
+        msg_public_IK = msg[:IK_FIN]
+        msg_public_EK = msg[IK_FIN: EK_FIN]
+        msg_public_OTPK = msg[EK_FIN:OTPK_FIN]
+        msg_nonce = msg[OTPK_FIN: NONCE_FIN]
+        msg_tag = msg[NONCE_FIN: TAG_FIN]
+        msg_ciphertext = msg[TAG_FIN:]
+        
+        # Find private OTPK from msg's public OTPK
+        secret_OTPK = None
+        for i in range(len(self.secret_OTPK)):
+            tmp_public_OTPK = self.get_bytes(self.secret_OTPK[i][1], False)
+            if(msg_public_OTPK == tmp_public_OTPK):
+                secret_OTPK = self.secret_OTPK[i][0]
+                break
+        
+        if secret_OTPK is None:
+            print("ERROR - Cannot find private OneTimePrekey used!")
+            return
+
+
+        # Calculate key material - applying reverse X3DH
+        sender_IK = self.get_pub_key(msg_public_IK, False)
+        sender_EK = self.get_pub_key(msg_public_EK, False)
+
+        DH1 = self.secret_SPK.exchange(sender_IK)
+        DH2 = self.secret_IK.exchange(sender_EK)
+        DH3 = self.secret_SPK.exchange(sender_EK)
+        DH4 = secret_OTPK.exchange(sender_EK)
+
+        key_material = HKDF_F + DH1 + DH2 + DH3 + DH4
+
+        # Calculate shared_key using reverse X3DH key meterial
+        shared_key = HKDF(
+            algorithm=hashes.SHA256(),
+            length=HKDF_LEN,
+            salt=HKDF_SALT,
+            info=None,
+        ).derive(key_material)
+
+
+        # Decrypt msg
+        AESGCM_KEY = AESGCM(shared_key)
+        payload = AESGCM_KEY.decrypt(msg_nonce, msg_ciphertext, None)
+
+        # Check if decrypted has correct size
+        if(len(payload) < 128):
+            print("ERROR - Could not decrypt msg")
+
+        # Deconstruct payload and extract info
+        msg_signature = payload[:64]
+        msg_ad = payload[64:128]
+        msg_contents = payload[128:]
+        
+
+        # Check if msg AD matches server AD -- AD = sender_IK + recv_IK
+        sender_IK_bytes = self.get_bytes(sender_key_bundle['IK'], False)
+        recv_IK_bytes = self.get_bytes(self.public_IK, False)
+        if(msg_ad != sender_IK_bytes + recv_IK_bytes):
+            print("ERROR - Identity Keys don't match!")
+            return
+
+        # Verify that msg + key combination is intact
+        key_combination = msg_public_IK + msg_public_EK + msg_public_OTPK
+
+        try:
+            sender_key_bundle['ED'].verify(msg_signature, key_combination + msg_contents)
+        except InvalidSignature as e:
+            print(e)
+            return
+        
+        # msg is decrypted + intact
+        # TODO - Delete OneTimePrekeys
+        # Must delete public keys but can keep secret keys for a little bit
+
+        decoded_msg = msg_contents.decode()
+        msg = json.loads(decoded_msg)
+
+        # print()
+        # print("     Message Received:   ", msg['msg'])
+        # print()
+        return msg['msg']
+
+
+        ##### Sanity Check #####
+        # print("MESSAGE INFORMATION")
+        # print("public_IK:       ", sender_public_IK)
+        # print("public_EK:       ", sender_public_EK)
+        # print("public_OTPK:     ", recv_public_OTPK)
+        # print("nonce:           ", msg_nonce)
+        # print("tag:             ", msg_tag)
+        # print("ct:              ", msg_ciphertext)
+        
+
+    def get_key_bundle(self, receiver):
+        # TODO - Ensure server key_bundle is up to date
+        #      - Ensure sender updates receiver's key_bundle
+
+        if receiver in self.key_bundles:
+            return True
+        
+        else:
+            recv_key_bundle = server.get_KeyBundle(recv_username=receiver)
+            recv_OTPK = server.get_OTPK(recv_username=receiver)
+
+            self.key_bundles[receiver] = {
+                'IK': self.get_pub_key(recv_key_bundle['IdentityKey'], False),
+                'ED': self.get_pub_key(recv_key_bundle['EdwardsKey'], True),
+                'SPK': self.get_pub_key(recv_key_bundle['SignedPrekey'], False),
+                'Signature': recv_key_bundle['Signature'],
+                'OTPK': self.get_pub_key(recv_OTPK['OneTimePrekey'], False)
+            }
+            return True
+
+    def get_sec_key(self, secret_byte, is_Edwards):
+        '''
+        Converts bytes to a secret key object
+        '''
+        if is_Edwards is True:
+            sec_key = ed25519.Ed25519PrivateKey.from_private_bytes(secret_byte)
+            return sec_key
+
+        sec_key = x25519.X25519PrivateKey.from_private_bytes(secret_byte)
+        return sec_key
+
+    def get_pub_key(self, public_byte, is_Edwards):
+        '''
+        Converts bytes to a public key object
+        '''
+        if is_Edwards is True:
+            pub_key = ed25519.Ed25519PublicKey.from_public_bytes(public_byte)
+            return pub_key
+
+        pub_key = x25519.X25519PublicKey.from_public_bytes(public_byte)
+        return pub_key
+
+    def get_bytes(self, key, is_secret) -> bytes:
+        '''
+        Converts a key object into bytes
+        '''
+        if is_secret is True:
+            key_bytes = key.private_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PrivateFormat.Raw,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            return key_bytes
+        else: # key is public
+            key_bytes = key.public_bytes(
+                encoding=serialization.Encoding.Raw,
+                format=serialization.PublicFormat.Raw
+            )
+            return key_bytes

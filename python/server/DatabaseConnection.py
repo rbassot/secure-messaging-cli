@@ -37,6 +37,24 @@ class DatabaseConn():
         count = int(cursor.fetchone()[0])
         return count
 
+    def get_KeyBundle(self, recv_username):
+        # See https://docs.python.org/3/library/sqlite3.html#row-objects for more info
+        self.db_connection.row_factory = sqlite3.Row 
+        cursor = self.db_connection.cursor()
+        data = [recv_username]
+        query = "SELECT * FROM KeyBundle WHERE username = ?"
+        cursor.execute(query, data)
+        return cursor.fetchone()
+
+    def get_OTPK(self, recv_username):
+        # See https://docs.python.org/3/library/sqlite3.html#row-objects for more info
+        self.db_connection.row_factory = sqlite3.Row
+        cursor = self.db_connection.cursor()
+        data = [recv_username]
+        query = "SELECT OneTimePrekey FROM OTPK WHERE username = ?"
+        cursor.execute(query, data)
+        return cursor.fetchone()
+
     def insert_new_account(self, first_name, last_name, username, password):
         #get row count for ID field
         try:
@@ -68,6 +86,36 @@ class DatabaseConn():
             print("INSERT MESSAGE ERROR: " + str(e))
             return 0
 
+    def insert_KeyBundle(self, username, public_IK, public_ED, public_SPK, SIG):
+        try:
+            cursor = self.db_connection.cursor()
+            # row_count = self.get_Account_row_count()
+            # print(row_count)
+            data = [username, public_IK, public_ED, public_SPK, SIG]
+            query = "INSERT INTO KeyBundle VALUES(?, ?, ?, ?, ?)"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("INSERT ERROR: " + str(e))
+            return 0
+
+
+    def insert_OTKP(self, username, public_OTPK):
+        try:
+            cursor = self.db_connection.cursor()
+            # row_count = self.get_Account_row_count()
+            # print(row_count)
+            data = [username, public_OTPK]
+            query = "INSERT INTO OTPK(username, OneTimePrekey) VALUES(?, ?)"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("INSERT ERROR: " + str(e))
+            return 0
 
     def get_message_history(self, send_username, recv_username):
         cursor = self.db_connection.cursor()
@@ -163,3 +211,26 @@ class DatabaseConn():
         cursor.execute(query)
         self.db_connection.commit()
 
+    def create_KeyBundle_table(self):
+        cursor = self.db_connection.cursor()
+        query = ''' CREATE TABLE IF NOT EXISTS KeyBundle(
+                        username TEXT PRIMARY KEY,
+                        IdentityKey TEXT NOT NULL,
+                        EdwardsKey TEXT NOT NULL, 
+                        SignedPrekey TEXT NOT NULL,
+                        Signature TEXT NOT NULL
+                    )        
+                '''
+        cursor.execute(query)
+        self.db_connection.commit()
+
+
+    def create_OTPK_table(self):
+        cursor = self.db_connection.cursor()
+        query = ''' CREATE TABLE IF NOT EXISTS OTPK(
+                        username TEXT NOT NULL,
+                        OneTimePrekey TEXT NOT NULL
+                    )
+                '''
+        cursor.execute(query)
+        self.db_connection.commit()
