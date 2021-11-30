@@ -55,6 +55,14 @@ class DatabaseConn():
         cursor.execute(query, data)
         return cursor.fetchone()
 
+    def get_count_OTPK(self, username):
+        cursor = self.db_connection.cursor()
+        data = [username]
+        query = "SELECT COUNT(*) FROM OTPK WHERE username = ?"
+        cursor.execute(query, data)
+        count = int(cursor.fetchone()[0])
+        return count
+
     def insert_new_account(self, first_name, last_name, username, password):
         #get row count for ID field
         try:
@@ -89,8 +97,7 @@ class DatabaseConn():
     def insert_KeyBundle(self, username, public_IK, public_ED, public_SPK, SIG):
         try:
             cursor = self.db_connection.cursor()
-            # row_count = self.get_Account_row_count()
-            # print(row_count)
+
             data = [username, public_IK, public_ED, public_SPK, SIG]
             query = "INSERT INTO KeyBundle VALUES(?, ?, ?, ?, ?)"
             cursor.execute(query, data)
@@ -105,16 +112,29 @@ class DatabaseConn():
     def insert_OTKP(self, username, public_OTPK):
         try:
             cursor = self.db_connection.cursor()
-            # row_count = self.get_Account_row_count()
-            # print(row_count)
+
             data = [username, public_OTPK]
-            query = "INSERT INTO OTPK(username, OneTimePrekey) VALUES(?, ?)"
+            query = "INSERT INTO OTPK VALUES(?, ?)"
             cursor.execute(query, data)
             self.db_connection.commit()
             return 1
         
         except Exception as e:
             print("INSERT ERROR: " + str(e))
+            return 0
+
+    def delete_OTPK(self, username, public_OTPK):
+        try:
+            cursor = self.db_connection.cursor()
+
+            data = [username, public_OTPK]
+            query = "DELETE FROM OTPK WHERE username = ? AND OneTimePrekey = ?"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("DELETE OneTimePrekey ERROR: " + str(e))
             return 0
 
     def get_message_history(self, send_username, recv_username):
@@ -229,7 +249,8 @@ class DatabaseConn():
         cursor = self.db_connection.cursor()
         query = ''' CREATE TABLE IF NOT EXISTS OTPK(
                         username TEXT NOT NULL,
-                        OneTimePrekey TEXT NOT NULL
+                        OneTimePrekey TEXT NOT NULL,
+                        PRIMARY KEY(username, OneTimePrekey)
                     )
                 '''
         cursor.execute(query)

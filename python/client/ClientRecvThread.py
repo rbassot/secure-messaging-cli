@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from sys import *
-from os import *
+import os
 from time import *
 from socket import *
 from threading import *
@@ -52,7 +52,7 @@ class ClientRecvThread(Thread):
 
     
     def clear_screen(self):
-        system('clear')
+        os.system('cls' if os.name == 'nt' else 'clear')
         return
 
     

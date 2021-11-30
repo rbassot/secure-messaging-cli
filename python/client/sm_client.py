@@ -5,7 +5,7 @@ from socket import *
 from threading import *
 from queue import *
 from sqlite3 import * #For future database implementation
-from os import *
+import os
 from time import *
 import json
 import ast
@@ -26,7 +26,8 @@ client_key = None                            #dictionary of client keys needed f
 threads = []
 
 def clear_screen():
-    system('clear')
+    os.system('cls' if os.name == 'nt' else 'clear')
+    return
 
 
 def register_attempt():
