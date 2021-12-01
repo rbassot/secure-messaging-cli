@@ -182,6 +182,19 @@ class ServerThread(Thread):
         self.sock.send(serialized_resp)
         return
 
+    
+    def delete_all_histories(self, this_username):
+        #delete all messages corresponding to the user's history with the specified client
+        if(not self.db_conn.delete_all_histories(this_username)):
+            print("Error deleting message history!")
+            return
+
+        #send confirmation of deletion back to the client
+        delete_all_resp = "{'command':'delete-history', 'response':'SUCCESS', 'message':'Successfully deleted all your conversation histories.'}"
+        serialized_resp = json.dumps(delete_all_resp).encode()
+        self.sock.send(serialized_resp)
+        return
+
 
     def new_connection(self):
         while True:
@@ -247,6 +260,10 @@ class ServerThread(Thread):
             #handle deleting the client's history from the database
             elif(client_req['command'] == 'delete-history'):
                 self.delete_history(client_req['my_username'], client_req['other_username'])
+
+            #handle deleting ALL the client's histories from the database
+            elif(client_req['command'] == 'delete-all-histories'):
+                self.delete_all_histories(client_req['my_username'])
             
             #Shouldn't need exit handling - returning from the thread above properly cleans it up
             '''elif(client_req['command'] == 'exit'):

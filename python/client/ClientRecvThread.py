@@ -146,7 +146,7 @@ class ClientRecvThread(Thread):
             try:
                 #***must handle decrypting the sent messages from the server prior to printing***
                 #self.locked_print(row)
-                encr_message = str(row[3])
+                encr_message = str(row[4])
                 #self.locked_print(encr_message)
                 #decrypt...
                 message = encr_message
@@ -216,6 +216,13 @@ class ClientRecvThread(Thread):
                     self.locked_print(server_resp['message'])
                     config.shared_event.set()
                     config.shared_event.clear()
+
+                #handle deleting ALL conversation histories - required at the end of every session
+                elif(server_resp['command'] == 'delete-all-histories'):
+                    self.locked_print(server_resp['message'])
+                    config.shared_event.set()
+                    config.shared_event.clear()
+                
 
             #exit on any exception type
             except Exception as e:

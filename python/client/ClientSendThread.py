@@ -110,7 +110,7 @@ class ClientSendThread(Thread):
         #on every new message, recalculate the shared key prior to sending
 
         #locked_print req'd here
-        system('clear')
+        os.system('clear')
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
             #create sender-side client request
@@ -201,8 +201,8 @@ class ClientSendThread(Thread):
     def request_delete_history(self, other_username):
         #ask the server to delete conversation history with a specific user
         try:
-            req_conversation = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
-            serialized_req = json.dumps(req_conversation).encode()
+            req_deletion = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Delete a conversation history'}"%(self.username, other_username)
+            serialized_req = json.dumps(req_deletion).encode()
             self.sock.send(serialized_req)
 
             #blocks the sender thread here until the RecvThread prints out confirmation of deletion
@@ -210,6 +210,21 @@ class ClientSendThread(Thread):
 
         except:
             self.locked_print("There was an issue with deleting the history...")
+        return
+
+
+    def request_delete_all_histories(self, my_username):
+        #ask the server to delete all conversations owned by this client
+        try:
+            req_delete_all = "{'command':'delete-all-histories', 'my_username':'%s', 'message':'Delete all conversation histories'}"%(self.username)
+            serialized_req = json.dumps(req_delete_all).encode()
+            self.sock.send(serialized_req)
+
+            #blocks the sender thread here until the RecvThread prints out confirmation of deletion
+            config.shared_event.wait()
+
+        except:
+            self.locked_print("There was an issue with deleting all the histories...")
         return
 
 
@@ -238,6 +253,9 @@ class ClientSendThread(Thread):
 
                 #handle program exit
                 elif(option == "--exit"):
+                    #notify the server to delete message history for the client (session terminates)
+                    self.request_delete_all_histories(self.username)
+
                     #MUST notify the server here to remove client from auth_users + connections lists
                     self.close_server_conn()
                     return 0
@@ -246,6 +264,9 @@ class ClientSendThread(Thread):
                 elif(option == "--logout"):
                     #MUST notify the server here to remove client from auth_users + connections lists
                     #self.close_server_conn()
+
+                    #notify the server to delete message history for the client (session terminates)
+                    self.request_delete_all_histories(self.username)
                     return 1
 
                 #handle user retrieving conversation history

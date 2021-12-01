@@ -161,6 +161,21 @@ class DatabaseConn():
             return 0
 
 
+    #deletes all conversation histories for a client - required once a sesssion is terminated!
+    def delete_all_histories(self, req_username):
+        try:
+            cursor = self.db_connection.cursor()
+            data = [req_username]
+            query = "DELETE FROM Message WHERE owned_username LIKE ?"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+
+        except Exception as e:
+            print("DELETE HISTORY ERROR: " + str(e))
+            return 0
+
+
     def is_valid_username_password(self, username, password):
         try:
             cursor = self.db_connection.cursor()
