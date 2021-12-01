@@ -190,7 +190,7 @@ class ServerThread(Thread):
             return
 
         #send confirmation of deletion back to the client
-        delete_all_resp = "{'command':'delete-history', 'response':'SUCCESS', 'message':'Successfully deleted all your conversation histories.'}"
+        delete_all_resp = "{'command':'delete-all-histories', 'response':'SUCCESS', 'message':'Successfully deleted all your conversation histories.'}"
         serialized_resp = json.dumps(delete_all_resp).encode()
         self.sock.send(serialized_resp)
         return
@@ -241,7 +241,6 @@ class ServerThread(Thread):
             # 6 - notify client A that the request was accepted & connection can be established (from ServerThread A)
             elif(client_req['command'] == 'chat'):
                 #Step 1 - receive request from sending client to establish a new chat connection
-                print("Entering handle_new_chat()")
                 self.handle_new_chat(client_req['send_username'], client_req['recv_username'])
 
             #Step 4 - receive response from the receiver client (on ServerThread B)
@@ -249,7 +248,6 @@ class ServerThread(Thread):
                 self.accept_chat_request()
 
             #basic redirection of a chat message from clientA to clientB
-            #To implement
             elif(client_req['command'] == 'message_sent'):
                 self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
 

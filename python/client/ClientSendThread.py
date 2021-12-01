@@ -221,7 +221,9 @@ class ClientSendThread(Thread):
             self.sock.send(serialized_req)
 
             #blocks the sender thread here until the RecvThread prints out confirmation of deletion
+            self.locked_print("Before")
             config.shared_event.wait()
+            self.locked_print("After")
 
         except:
             self.locked_print("There was an issue with deleting all the histories...")
@@ -318,7 +320,6 @@ class ClientSendThread(Thread):
             #handle main menu interface
             #graceful program exit - throws an exception for the main thread to be notified
             if not (self.main_menu()):
-                self.locked_print("Raising BaseException")
                 self.exception = BaseException
                 return
 

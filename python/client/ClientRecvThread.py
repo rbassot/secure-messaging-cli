@@ -173,7 +173,9 @@ class ClientRecvThread(Thread):
 
 
     def listen(self):
-        while True: #test if an event trigger is needed to break out of this loop
+        running = True
+
+        while running: #test if an event trigger is needed to break out of this loop
             try:
                 server_data = self.sock.recv(1024).decode()
 
@@ -222,12 +224,15 @@ class ClientRecvThread(Thread):
                     self.locked_print(server_resp['message'])
                     config.shared_event.set()
                     config.shared_event.clear()
+                    return 1
                 
 
             #exit on any exception type
             except Exception as e:
                 self.locked_print(e)
                 return 0
+
+        return
 
 
     #Override: continuous execution of the receiver thread

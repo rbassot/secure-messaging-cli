@@ -183,7 +183,7 @@ def start_client():
     print(recv_msg)
 
     #--- Login Menu ---
-    while True:
+    while True: #TO FIX: Needs to handle reconnecting to the server - The server should drop the prev closed connection then?
 
         #initial login/registration handling
         if(not login_or_register()):
@@ -207,7 +207,6 @@ def start_client():
         while True:
             try:
                 send_thread.join()
-                #pill2kill.set()
                 recv_thread.join()
 
                 #return to login menu scope
