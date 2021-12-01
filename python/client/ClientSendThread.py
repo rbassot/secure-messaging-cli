@@ -220,13 +220,26 @@ class ClientSendThread(Thread):
             serialized_req = json.dumps(req_delete_all).encode()
             self.sock.send(serialized_req)
 
-            #blocks the sender thread here until the RecvThread prints out confirmation of deletion
-            self.locked_print("Before")
+            #blocks the sender thread here until the RecvThread prints out confirmation of histories deletion
             config.shared_event.wait()
-            self.locked_print("After")
 
         except:
             self.locked_print("There was an issue with deleting all the histories...")
+        return
+
+
+    def request_delete_account(self, my_username):
+        #ask the server to delete my account & accompanying message histories
+        try:
+            req_delete_account = "{'command':'delete-account', 'my_username':'%s', 'message':'Delete my account.'}"%(self.username)
+            serialized_req = json.dumps(req_delete_account).encode()
+            self.sock.send(serialized_req)
+
+            #blocks the sender thread here until the RecvThread prints out confirmation of account deletion
+            config.shared_event.wait()
+
+        except:
+            self.locked_print("There was an issue with deleting the client's account...")
         return
 
 
@@ -278,6 +291,11 @@ class ClientSendThread(Thread):
                 #handle user retrieving conversation history
                 elif(option == "--delete-history"):
                     self.request_delete_history(recv_user)
+
+                #handle account deletion (with all accompanying owned conversation histories)
+                elif(option == "--delete-account"):
+                    self.request_delete_account(self.username)
+                    return 1
 
                 #Receiver-side chat initialization for the SendThread
                 elif(option == 'y'):

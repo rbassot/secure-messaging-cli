@@ -79,6 +79,21 @@ class DatabaseConn():
             return 0
 
 
+    def delete_account(self, client_username):
+        #delete a specific account from Account table
+        try:
+            cursor = self.db_connection.cursor()
+            data = [client_username]
+            query = "DELETE FROM Account WHERE username LIKE ?"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("DELETE ACCOUNT ERROR: " + str(e))
+            return 0
+
+
     def insert_new_message(self, owner_username, send_username, recv_username, encr_message):
         #get row count for ID field
         try:
@@ -183,7 +198,6 @@ class DatabaseConn():
             query = "SELECT * FROM Account WHERE username = ? AND password = ?"
             cursor.execute(query, data)
             entries_matched = len(cursor.fetchall())
-            print("Amount of tuples returned: " + str(entries_matched))
 
             #check that there is exactly one entry matching the user/pass pair
             if(entries_matched != 1):
@@ -204,7 +218,6 @@ class DatabaseConn():
             query = "SELECT * FROM Account WHERE username = ?"
             cursor.execute(query, data)
             entries_matched = len(cursor.fetchall())
-            #print("Amount of tuples returned: " + str(entries_matched))
 
             #check that there is exactly one entry matching the desired username
             if(entries_matched != 1):

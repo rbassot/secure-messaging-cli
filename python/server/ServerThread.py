@@ -117,12 +117,6 @@ class ServerThread(Thread):
 
     
     def handle_registration(self, client_first, client_last, client_username, client_password):
-        #implement registration with database here
-        #User fields: account_id, username, password, first_name, last_name
-        #-check that username is unique
-        #-get next ID and assign it to the new user
-        #-store new account info in the DB - the password (others?) should certainly be stored in encrypted form
-
         #pass account info to database object for account creation
         response = ""
         if(self.db_conn.insert_new_account(client_first, client_last, client_username, client_password)):
@@ -130,6 +124,21 @@ class ServerThread(Thread):
 
         else:
             response = "{'response':'FAILURE', 'message':'Account creation was not successful!'}"
+
+        serialized_resp = json.dumps(response).encode()
+        self.sock.send(serialized_resp)
+        return
+
+
+    def handle_account_deletion(self, client_username):
+        #delete client's account record from the database AND all of their owned message histories
+        #TODO: extend this to delete all OTPKs and public key bundle
+        response = ""
+        if(self.db_conn.delete_account(client_username) and self.db_conn.delete_all_histories(client_username)):
+            response = "{'command':'delete-account', 'response':'SUCCESS', 'message':'Successfully deleted your account information.'}"
+
+        else:
+            response = "{'command':'delete-account', 'response':'FAILURE', 'message':'Account deletion was not successful!'}"
 
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
@@ -151,7 +160,6 @@ class ServerThread(Thread):
         else:
             response = "{'response':'FAILURE', 'message':'Login was not successful!'}"
 
-        print(response)
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
         return
@@ -262,6 +270,10 @@ class ServerThread(Thread):
             #handle deleting ALL the client's histories from the database
             elif(client_req['command'] == 'delete-all-histories'):
                 self.delete_all_histories(client_req['my_username'])
+
+            #handle deleting the client's account + ALL their conversation histories
+            elif(client_req['command'] == 'delete-account'):
+                self.handle_account_deletion(client_req['my_username'])
             
             #Shouldn't need exit handling - returning from the thread above properly cleans it up
             '''elif(client_req['command'] == 'exit'):

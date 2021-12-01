@@ -148,6 +148,7 @@ class ClientRecvThread(Thread):
                 #self.locked_print(row)
                 encr_message = str(row[4])
                 #self.locked_print(encr_message)
+
                 #decrypt...
                 message = encr_message
 
@@ -221,6 +222,13 @@ class ClientRecvThread(Thread):
 
                 #handle deleting ALL conversation histories - required at the end of every session
                 elif(server_resp['command'] == 'delete-all-histories'):
+                    self.locked_print(server_resp['message'])
+                    config.shared_event.set()
+                    config.shared_event.clear()
+                    return 1
+
+                #handle your account deletion - terminates the session
+                elif(server_resp['command'] == 'delete-account'):
                     self.locked_print(server_resp['message'])
                     config.shared_event.set()
                     config.shared_event.clear()
