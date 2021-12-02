@@ -168,13 +168,30 @@ class ServerThread(Thread):
     def retrieve_history(self, this_username, other_username):
         #retrieve all messages from the DB for this users conversation history with specific client
         messages = self.db_conn.get_message_history(this_username, other_username)
+        # print(messages, type(messages))
         if(not messages):
             print("There were no messages in the client's history!")
 
         #send the list of messages (could be empty!) back over to the client
+        # print("entering history resp...")
         history_resp = '''{"command":"history", "response":"SUCCESS", "message_list":"%s", "other_username":"%s", "message":"Successfully retrieved conversation history."}'''%(messages, other_username)
+        # history_resp = "{\'command\':\'history\', \'response\':\'SUCCESS\', \'message_list\':\'%s\', \'other_username\':\'%s\', \'message\':\'Successfully retrieved conversation history.\'}"%(messages, other_username)
+        # print("entering serialized resp...")
+
         serialized_resp = json.dumps(history_resp).encode()
-        self.sock.send(serialized_resp)
+
+        # print(serialized_resp, type(serialized_resp))
+        # print()
+        # print("sending serialized resp...")
+        # print("LENGTH", len(serialized_resp))
+        # losing first 1024 bytes, prepend to make up for loss
+        random_bytes = b'1'*1024
+        try:
+            sent_size = self.sock.send(random_bytes + serialized_resp)
+            # print("sent size:", sent_size)
+        except Exception as e:
+            print(e)
+        
         return
 
 

@@ -1,4 +1,5 @@
 from threading import Lock, Event
+from encryption import User
 
 #thread lock needed for resource contention - stdout file descriptor
 lock = Lock()
@@ -11,3 +12,5 @@ shared_event.clear()
 #mainly needed for the receiver-side client to determine who to send to in its SendThread
 connections = {}
 connected_username = None
+
+username = None

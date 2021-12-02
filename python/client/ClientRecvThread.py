@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import binascii
 from sys import *
 import os
 from time import *
@@ -11,6 +12,8 @@ import ast
 #from PIL import Image
 
 import config
+from encryption import User
+import binascii
 
 '''
 Basic ClientRecvThread class for the client-side to continually listen to the server.
@@ -22,6 +25,12 @@ class ClientRecvThread(Thread):
         self.sock = socket
         self.addr = address
         self.username = username
+        self.enc_user = None
+
+        if(config.username == None):
+            config.username = User(username)
+
+        self.enc_user = config.username
 
     
     #Function to acquire shared resource (stdout file descriptor) before printing to screen
@@ -80,7 +89,15 @@ class ClientRecvThread(Thread):
 
                 #print out the formatted message in blue to the client console
                 if(message_json['command'] == 'message_recv'):
-                    message_str = str(other_username) + ": " + str(message_json['message'])
+                    # convert str msg to hex then to bytes
+                    enc_msg_hex = message_json['message'].encode('utf-8')
+                    enc_msg_bytes = binascii.unhexlify(enc_msg_hex)
+                    # print(enc_msg_bytes)
+
+                    decrypt_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
+
+
+                    message_str = str(other_username) + ": " + str(decrypt_msg)
                     self.locked_print('\033[94m' + message_str + '\033[0m')
 
             #exit chat on any exception
@@ -142,22 +159,31 @@ class ClientRecvThread(Thread):
         self.clear_screen()
         self.locked_print("")
         self.locked_print("--- Conversation history with " + str(other_username) + ": ---")
+
+        # print(message_list)
         for row in message_list:
             try:
                 #***must handle decrypting the sent messages from the server prior to printing***
                 #self.locked_print(row)
                 encr_message = str(row[4])
+                # print(encr_message)
                 #self.locked_print(encr_message)
+                # #decrypt...
 
-                #decrypt...
-                message = encr_message
+                enc_msg_hex = encr_message.encode('utf-8')
+                enc_msg_bytes = binascii.unhexlify(enc_msg_hex)
 
                 #own messages to the other client (outgoing)
                 if(str(row[2]) == self.username):
+                    # print(enc_msg_bytes)
+                    decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, True)
+                    message = decrypted_msg
                     self.locked_print("You: " + message)
 
                 #own messages from the other client (incoming)
                 elif(str(row[2]) == other_username):
+                    decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
+                    message = decrypted_msg
                     message_str = other_username + ": " + message
                     self.locked_print('\033[94m' + message_str + '\033[0m')
 
@@ -178,15 +204,37 @@ class ClientRecvThread(Thread):
 
         while running: #test if an event trigger is needed to break out of this loop
             try:
-                server_data = self.sock.recv(1024).decode()
+                # getting size of serialized data
+                data = b''
+                part = b''
+
+                while True:
+                    part = self.sock.recv(1024)
+                    data+= part
+                    # print("data", data)
+                    # print("part", part.decode())
+                    if len(part) < 1024:
+                        break
+                
+                print("receiving data")
+                server_data = data
+
+                # print(server_data, type(server_data), len(server_data))
+
+                server_data = server_data.decode()
 
                 #server closed the connection - terminate the threads
                 if not(server_data):
                     return 1
 
                 #parse the server's message into a dictionary
+                # print(server_data, type(server_data), len(server_data))
                 server_resp = json.loads(server_data)
+                # print(server_resp, type(server_resp))
+                # error here
+                print("AST LITERAL")
                 server_resp = ast.literal_eval(server_resp)
+                # print(server_resp, type(server_resp))
 
                 #check server response type for state of the response
                 #self.locked_print("Server response type: " + str(server_resp['response']))
@@ -203,8 +251,11 @@ class ClientRecvThread(Thread):
                 #handle receiving conversation history from the server
                 elif(server_resp['command'] == 'history'):
                     #destringify the message list back into a list - apply literal_eval again
+                    print("ast litreal...")
                     message_list = ast.literal_eval(server_resp['message_list'])
+                    print(message_list, type(message_list))
                     if message_list:
+                        print("calling format msg history")
                         self.format_message_history(server_resp['other_username'], message_list)
                     else:
                         self.locked_print("")

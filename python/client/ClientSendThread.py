@@ -11,6 +11,8 @@ import ast
 #from PIL import Image
 
 import config
+from encryption import User
+import binascii
 
 '''
 Basic ClientSendThread class for the client-side to handle user interface/interaction & send requests to the server.
@@ -24,6 +26,12 @@ class ClientSendThread(Thread):
         self.username = username
         #self.queue = queue
         self.exception = None
+        self.enc_user = None
+
+        if(config.username == None):
+            config.username = User(username)
+
+        self.enc_user = config.username
 
 
     #Override: to be able to pass the exception to the called thread (main)
@@ -171,7 +179,14 @@ class ClientSendThread(Thread):
 
                 #format & serialize the message, then send to server
                 #encryption step?
-                serialized_req = self.serialize_chat_message(user_message, other_username)
+                encrypted_msg = self.enc_user.encrypt_msg(other_username, user_message)
+                # print(encrypted_msg)
+                
+                # converting enc msg bytes to str
+                to_hex = binascii.hexlify(encrypted_msg)
+                str_enc_msg = to_hex.decode()
+
+                serialized_req = self.serialize_chat_message(str_enc_msg, other_username)
                 self.sock.send(serialized_req)
 
                 #finally, print the client's own message to its own chat window
@@ -191,7 +206,9 @@ class ClientSendThread(Thread):
             self.sock.send(serialized_req)
 
             #blocks the sender thread here until the RecvThread prints out full convo history
+            print("waiting from send thread")
             config.shared_event.wait()
+            print("sanity check")
 
         except:
             self.locked_print("There was an issue with sending the history request...")
