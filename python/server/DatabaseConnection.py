@@ -8,6 +8,9 @@ import json
 import ast
 #from PIL import Image
 
+import binascii
+from cryptography.hazmat.primitives import hashes
+
 '''
 Database Connection class to handle communication from a server thread to the server's database resource (SQLite3 DB).
 '''
@@ -194,17 +197,44 @@ class DatabaseConn():
     def is_valid_username_password(self, username, password):
         try:
             cursor = self.db_connection.cursor()
-            data = [username, password]
-            query = "SELECT * FROM Account WHERE username = ? AND password = ?"
+            data = [username]
+            query = "SELECT * FROM Account WHERE username = ?"
             cursor.execute(query, data)
-            entries_matched = len(cursor.fetchall())
+            entry = cursor.fetchall()
+            entries_matched = len(entry)
 
             #check that there is exactly one entry matching the user/pass pair
             if(entries_matched != 1):
                 return 0
 
             #login successful
-            else: return 1
+            else:
+                # get password hash from server - format is entry[0] = (id, f_name, l_name, username, enc_pass)
+                # registration password is hashed then stored in the server as a str
+                # convert pass hash str to bytes
+                server_hash_bytes = entry[0][4].encode('utf-8')
+                # convert bytes to hash format
+                server_hash_pass = binascii.unhexlify(server_hash_bytes)
+                print(server_hash_pass)
+
+                # get salt from server hash
+                salt = server_hash_pass[-16:]
+
+                # calculate hash using given password
+                login_digest = hashes.Hash(hashes.SHA256())
+                login_digest.update(password.encode('utf-8'))
+                login_hash_pass = login_digest.finalize()
+                # append salt to hash
+                login_hash_pass += salt
+                salt = None
+                
+                print(login_hash_pass)
+                # compare server hash and login hash
+                if(server_hash_pass == login_hash_pass):
+                    return 1    
+                else:
+                    return 0
+
 
         except Exception as e:
             print("LOGIN CHECK ERROR: " + str(e))

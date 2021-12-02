@@ -40,19 +40,23 @@ def register_attempt():
     password = input("Password: ")
 
     try:
-        # # encrypt pass
-        # reg_digest = hashes.Hash(hashes.SHA256())
-        # salt = os.urandom(16)
-        # reg_digest.update(password.encode('utf-8'))
-        # bytes_enc_pass = reg_digest.finalize()
-        # bytes_enc_pass += salt  # cant convert to str
-        # salt = None
-        # # parse encrypted_pass to str format and send to server
-        # hex_enc_pass = binascii.hexlify(bytes_enc_pass)     # hexlift bytes -> can convert to str
-        # str_enc_pass = hex_enc_pass.decode()                # encrypted_pass in str format
+        # start pass encryption
+        reg_digest = hashes.Hash(hashes.SHA256())
+        # generate random 16 byte salt
+        salt = os.urandom(16)
+        # calc hash from password
+        reg_digest.update(password.encode('utf-8'))
+        hash_pass = reg_digest.finalize()
+        # append salt to hash
+        hash_pass += salt  # cant convert to str
+        salt = None
+        # parse encrypted_pass to str format and send to server
+        hash_pass_bytes = binascii.hexlify(hash_pass)
+        hash_pass_str = hash_pass_bytes.decode()
 
         #send formatted login data to server
-        login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, password)
+        login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, hash_pass_str)
+        # login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, password)
         #must encrypt the login data here (encryption manager?)
         serialized_req = json.dumps(login_req).encode()
         sock.send(serialized_req)
@@ -82,32 +86,6 @@ def login_attempt():
     password = input("Password: ")
 
     try:
-        # retrive hash ed pass from server
-        # get salt
-        # calculate hash from password typed
-        # compare if hashes are equal!
-
-        # encode_pass = entries_matched['password'].encode('utf-8')
-        # reg_enc_pass = binascii.unhexlify(encode_pass)
-        # print(reg_enc_pass)
-
-        # # get salt
-        # salt = reg_enc_pass[-16:]
-
-        # # hash types password and compare
-        # login_digest = hashes.Hash(hashes.SHA256())
-        # login_digest.update(password.encode('utf-8'))
-        # enc_pass = login_digest.finalize()
-        # enc_pass += salt
-        # salt = None
-        
-        # print(enc_pass)
-
-        # if(enc_pass != reg_enc_pass):
-        #     return 0
-        # else:
-        #     return 1
-
         #send formatted login data to server
         login_req = "{'command':'login', 'username':'%s', 'password':'%s'}"%(username, password)
         #must encrypt the login data here (encryption manager?)
