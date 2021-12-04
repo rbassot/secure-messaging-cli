@@ -118,7 +118,6 @@ class ClientRecvThread(Thread):
         #listen to the new chat
         #receiver-side user chat scenario
         self.join_chat(recv_username)
-
         return
 
 

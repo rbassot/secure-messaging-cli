@@ -16,16 +16,55 @@ Basic ServerThread class for server-side handling of multiple clients.
 
 class ServerThread(Thread):
     def __init__(self, socket, address):    #Inherit from Thread class
+        '''
+        Initializes a ServerThread instance as a subclass of threading.Thread.
+        This thread handles the entirety of one client's requests, once that client
+        has authenticated and logged in. Once initialized, the thread begins execution
+        inside self.start().
+
+        Attributes
+        ----------
+        self.sock: socket.socket
+            The client's socket connection object.
+
+        self.addr: socket.AF_INET
+            The client's IPv4 address that they are connected from. 
+
+        self.db_conn: sqlite3.connect
+            The database connection object to communicate with the SQLite3 DB.
+
+        Returns
+        ----------
+        None
+        '''
         Thread.__init__(self)
-        print("New server thread created for client at: " + str(address))
         self.sock = socket
         self.addr = address
         self.db_conn = None
         #self.username? To determine if the client is logged in, so 'send', etc can be performed
+        print("New server thread created for client at: " + str(address))
         self.start()
 
 
     def handle_new_chat(self, send_username, recv_username):
+        '''
+        Server-side handling of a chat request from clientA. Sends a 'request to chat from
+        clientA' to clientB. This ServerThread - associated with clientA - will block until
+        confirmation is received at the clientB ServerThread, which triggers an event to
+        release the blocked thread.
+
+        Parameters
+        ----------
+        send_username: str
+            ClientA's (the sender-side client) username.
+
+        recv_username: str
+            ClientB's (the receiver-side client) username.
+
+        Returns
+        ----------
+        None
+        '''
         #Step 2 - send a request to the receiving client to establish connection
         req_to_connect = "{'command':'req_chat_from', 'response':'SUCCESS', 'send_username':'%s', 'message':'ClientA has requested to chat!'}"%(send_username)
         print("Step2: " + req_to_connect)
@@ -35,21 +74,6 @@ class ServerThread(Thread):
 
         #Step 3 - block this ServerThread A until the receiving client responds to ServerThreadB
         config.shared_event.wait()
-
-        #MOVE TO SERVERTHREAD B SIDE
-        '''
-        #Step 3 - receive response from the receiver-side client & parse it
-        recv_data = receiver_socket.recv(1024)
-        recv_response = json.loads(recv_data.decode())
-        recv_response = ast.literal_eval(recv_response)
-        serv1_socket = recv_response['serv_socket']
-        print("Step4: " + recv_response)
-
-        #FIX: assert that the received response from receiver-side client was a correct response
-        if(recv_response['command'] != 'accept_chat_req' or recv_response['recv_username'] != recv_username):
-            print("Error establishing the connection!")
-            return
-        '''
 
         #Step 6 - notify the sender client that the receiver confirmed the chat req
         sender_conn_confirm = "{'command':'chat_confirmed', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, recv_username)
@@ -63,6 +87,19 @@ class ServerThread(Thread):
 
 
     def accept_chat_request(self):
+        '''
+        Server-side handling of a chat response received from clientB. This function only
+        releases the blocked ServerThreadA, clears the event, and then returns to then
+        wait for any messages coming from clientB (directed towards client A).
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''
         #Step 5 - notify ServerThread A that the receiver's response was received
         config.shared_event.set()
         config.shared_event.clear()
@@ -71,7 +108,8 @@ class ServerThread(Thread):
         return
 
     
-    def confirm_new_chat(self, send_username, recv_username):
+    #REMOVE
+    '''def confirm_new_chat(self, send_username, recv_username):
         #Step 4 - forward response to the sender-side client
         #self.sock.send(recv_data)
         response = ""
@@ -83,20 +121,35 @@ class ServerThread(Thread):
 
         print("This is the response to confirm on the sender-side: " + response)
         serialized_resp = json.dumps(response).encode()
-        self.sock.send(serialized_resp)
+        self.sock.send(serialized_resp)'''
 
 
     def handle_send_message(self, send_client, recv_client, encr_message, image_attached=None):
-        #implement receiving a message from sender and forwarding to the receiver
-        #-user authenticity established before this point (via digital signature)
-        #-message is encrypted by sender (basic AES here?) and can only be decrypted by receiver (via private key?) once received
-        #-every new encrypted message should be added to storage at the server *TWICE*:
-        #     -->Once from perspective of the sender & Again from the perspective of the receiver (send/recv users are swapped)
-        #     -->This will allow one user to delete their message history w/o affecting the other's
-        #     (potentially include pre-populated DB with some messages)
-        #-**optional** should a receiving user NOT be online, the server should still store the message and notify the sender.
-        #   Then, upon connection of the receiving user to the server, the waiting encrypted message should be forwarded
+        '''
+        Server-side sending of a message from one client to another. The receiver client's
+        socket object is found in the shared config file, and used to forward the sent message.
+        Messages arrive at the server in encrypted form, and are unchanged when they are sent,
+        achieving forward secrecy for the transmission. Lastly, to obtain message histories,
+        each message is stored twice in the DB - once for each owner of that message. This is
+        required to separate Alice's history from Bob's history, where each of them can view
+        the correct perspective of their chats, and delete a conversation history without
+        affecting the history of other users.
 
+        Parameters
+        ----------
+        send_client: str
+            The sending client's username.
+
+        recv_client: str
+            The intended receiver client's username.
+
+        encr_message: str
+            The AES-GCM encrypted message, in string format.
+
+        Returns
+        ----------
+        None
+        '''
         #reformat & redirect the message to the receiving client
         forwarded_msg = "{'command':'message_recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
         serialized_msg = json.dumps(forwarded_msg).encode()
@@ -117,6 +170,29 @@ class ServerThread(Thread):
 
     
     def handle_registration(self, client_first, client_last, client_username, client_password):
+        '''
+        Server-side handling of a request to register a new client account. Account information
+        is inserted into the Account table in the DB. This table has a primary key on the 'username'
+        attribute, and therefore enforces unique usernames accross all registered accounts.
+
+        Parameters
+        ----------
+        client_first: str
+            The registering client's first name.
+
+        client_last: str
+            The registering client's last name.
+
+        client_username: str
+            The registering client's account username.
+
+        client_password: str
+            The registering client's account password.
+
+        Returns
+        ----------
+        None
+        '''
         #pass account info to database object for account creation
         response = ""
         if(self.db_conn.insert_new_account(client_first, client_last, client_username, client_password)):
@@ -131,6 +207,19 @@ class ServerThread(Thread):
 
 
     def handle_account_deletion(self, client_username):
+        '''
+        Server-side deletion of a client's account. Deletes all associated records
+        from all four tables - Account, Message, OTPK, KeyBundle.
+
+        Parameters
+        ----------
+        client_username: str
+            The username of the client account to be deleted.
+
+        Returns
+        ----------
+        None
+        '''
         #delete client's account record from the database AND all of their owned message histories
         #TODO: extend this to delete all OTPKs and public key bundle
         response = ""
@@ -146,14 +235,46 @@ class ServerThread(Thread):
 
 
     def add_active_connection(self, client_username):
+        '''
+        ServerThread publishing of resources for other ServerThreads to access. The connected
+        client's username and socket object is published to the config file. This allows
+        other ServerThreads to send messages to clients to which they are not associated.
+
+        Parameters
+        ----------
+        client_username: str
+            The username of the client information being published.
+
+        Returns
+        ----------
+        None
+        '''
         #add the Socket connections to the global - to be referenced by other server threads
         config.connections.update({client_username: self.sock})
         return
 
 
     def handle_login_req(self, client_username, client_password):
+        '''
+        Server-side handling of a client login request. Checks against the DB
+        to ensure that the client is registered and properly authenticates.
+        Then, sends a SUCCESS response to the client if authentication is
+        successful.
+
+        Parameters
+        ----------
+        client_username: str
+            The username of the client account to be authenticated.
+
+        client_password: str
+            The password of the client account to be authenticated.
+
+        Returns
+        ----------
+        None
+        '''
         #check if account is registered & that it is not currently connected with the server
-        #FIX!! config.auth....
+        #FIX!! config.auth.... to assert no duplicate connections to the same account!
         response = ""
         if(client_username not in config.authorized_users and self.db_conn.is_valid_username_password(client_username, client_password)):
             response = "{'response':'SUCCESS', 'message':'Successfully logged in.'}"
@@ -166,6 +287,24 @@ class ServerThread(Thread):
 
 
     def retrieve_history(self, this_username, other_username):
+        '''
+        Server-side retrieving of a client's history with the specified client.
+        The list of messages is a list of tuples, that contain information for the
+        owner of the message, the sender/receiver, and the encrypted message itself.
+        Tuples are sent to the client in raw format, and are parsed on arrival.
+
+        Parameters
+        ----------
+        this_username: str
+            The username of the client account requesting their history.
+
+        other_username: str
+            The username of the other client who was part of the conversation history being requested.
+
+        Returns
+        ----------
+        None
+        '''
         #retrieve all messages from the DB for this users conversation history with specific client
         messages = self.db_conn.get_message_history(this_username, other_username)
         # print(messages, type(messages))
@@ -185,9 +324,10 @@ class ServerThread(Thread):
         # print("sending serialized resp...")
         # print("LENGTH", len(serialized_resp))
         # losing first 1024 bytes, prepend to make up for loss
-        random_bytes = b'1'*1024
+        random_bytes = b'b'*1024
         try:
-            sent_size = self.sock.send(random_bytes + serialized_resp)
+            #to change!!!
+            sent_size = self.sock.sendall(random_bytes + serialized_resp)
             # print("sent size:", sent_size)
         except Exception as e:
             print(e)
@@ -196,6 +336,24 @@ class ServerThread(Thread):
 
 
     def delete_history(self, this_username, other_username):
+        '''
+        Server-side deleting of a client's history with the specified client.
+        Only the history owned by the requesting client is deleted. This allows
+        deletion to take place only in on client's environment - the other 
+        involved client can continue to view that conversation history.
+
+        Parameters
+        ----------
+        this_username: str
+            The username of the client account requesting their history to be deleted.
+
+        other_username: str
+            The username of the other client who was part of the conversation history being deleted.
+
+        Returns
+        ----------
+        None
+        '''
         #delete all messages corresponding to the user's history with the specified client
         if(not self.db_conn.delete_message_history(this_username, other_username)):
             print("Error deleting message history!")
@@ -209,6 +367,22 @@ class ServerThread(Thread):
 
     
     def delete_all_histories(self, this_username):
+        '''
+        Server-side deleting of every conversation history existing for the requesting
+        client. This operation is performed at every session termination for a client - 
+        logout, program exit, and account deletion. The reason for history deletion is
+        because Alice has no way of retrieving her private keys to decrypt past messages,
+        without saving a state outside of program execution.
+
+        Parameters
+        ----------
+        this_username: str
+            The username of the client account requesting all their histories to be deleted.
+
+        Returns
+        ----------
+        None
+        '''
         #delete all messages corresponding to the user's history with the specified client
         if(not self.db_conn.delete_all_histories(this_username)):
             print("Error deleting message history!")
@@ -222,6 +396,22 @@ class ServerThread(Thread):
 
 
     def new_connection(self):
+        '''
+        The main program loop of the ServerThread. Requests from the associated client
+        are waited upon, where the ServerThread blocks until a request is received.
+        The request is parsed and the request handling method used is determined by
+        the type of request that was sent ('command' parameter).
+
+        Should this function return, this ServerThread is terminated.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''
         while True:
             try:
                 client_data = self.sock.recv(1024)
@@ -308,6 +498,7 @@ class ServerThread(Thread):
         #temporary return to terminate the thread - where will this be placed?
         return
 
+        '''
         while True:
             try:
                 client_data = self.sock.recv(1024)
@@ -325,3 +516,4 @@ class ServerThread(Thread):
                 if(not client_data):
                     #must handle closing connection/removing conn object
                     break
+        '''
