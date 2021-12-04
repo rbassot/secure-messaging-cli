@@ -177,10 +177,8 @@ class ClientSendThread(Thread):
                     self.locked_print("Exiting the chat session...")
                     break
 
-                #format & serialize the message, then send to server
-                #encryption step?
+                #encrypt the message, format & serialize, then send to server
                 encrypted_msg = self.enc_user.encrypt_msg(other_username, user_message)
-                # print(encrypted_msg)
                 
                 # converting enc msg bytes to str
                 to_hex = binascii.hexlify(encrypted_msg)
@@ -206,9 +204,7 @@ class ClientSendThread(Thread):
             self.sock.send(serialized_req)
 
             #blocks the sender thread here until the RecvThread prints out full convo history
-            print("waiting from send thread")
             config.shared_event.wait()
-            print("sanity check")
 
         except:
             self.locked_print("There was an issue with sending the history request...")

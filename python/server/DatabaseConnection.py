@@ -207,7 +207,10 @@ class DatabaseConn():
             if(entries_matched != 1):
                 return 0
 
-            #login successful
+            # login successful
+            # password hashing process:
+            #   - passwords are SHA256 hashed, then a random 16-byte salt value is appended
+            #   - passwords are stored at-rest in hashed form
             else:
                 # get password hash from server - format is entry[0] = (id, f_name, l_name, username, enc_pass)
                 # registration password is hashed then stored in the server as a str
@@ -215,7 +218,6 @@ class DatabaseConn():
                 server_hash_bytes = entry[0][4].encode('utf-8')
                 # convert bytes to hash format
                 server_hash_pass = binascii.unhexlify(server_hash_bytes)
-                print(server_hash_pass)
 
                 # get salt from server hash
                 salt = server_hash_pass[-16:]
@@ -228,7 +230,6 @@ class DatabaseConn():
                 login_hash_pass += salt
                 salt = None
                 
-                print(login_hash_pass)
                 # compare server hash and login hash
                 if(server_hash_pass == login_hash_pass):
                     return 1    

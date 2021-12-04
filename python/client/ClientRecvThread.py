@@ -56,7 +56,7 @@ class ClientRecvThread(Thread):
             return user_input
 
         except:
-            #print("Error acquiring the lock for input!")
+            print("Error acquiring the lock for input!")
             return
 
     
@@ -89,13 +89,12 @@ class ClientRecvThread(Thread):
 
                 #print out the formatted message in blue to the client console
                 if(message_json['command'] == 'message_recv'):
-                    # convert str msg to hex then to bytes
+                    # convert str message to hex, then to a bytes type
                     enc_msg_hex = message_json['message'].encode('utf-8')
                     enc_msg_bytes = binascii.unhexlify(enc_msg_hex)
-                    # print(enc_msg_bytes)
 
+                    # decrypt the AESGCM-encrypted message
                     decrypt_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
-
 
                     message_str = str(other_username) + ": " + str(decrypt_msg)
                     self.locked_print('\033[94m' + message_str + '\033[0m')
@@ -160,14 +159,10 @@ class ClientRecvThread(Thread):
         self.locked_print("")
         self.locked_print("--- Conversation history with " + str(other_username) + ": ---")
 
-        # print(message_list)
         for row in message_list:
             try:
-                #***must handle decrypting the sent messages from the server prior to printing***
-                #self.locked_print(row)
+                #decrypt the sent messages from the server, then format and print to screen
                 encr_message = str(row[4])
-                # print(encr_message)
-                #self.locked_print(encr_message)
                 # #decrypt...
 
                 enc_msg_hex = encr_message.encode('utf-8')
@@ -175,7 +170,6 @@ class ClientRecvThread(Thread):
 
                 #own messages to the other client (outgoing)
                 if(str(row[2]) == self.username):
-                    # print(enc_msg_bytes)
                     decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, True)
                     message = decrypted_msg
                     self.locked_print("You: " + message)
@@ -210,17 +204,12 @@ class ClientRecvThread(Thread):
 
                 while True:
                     part = self.sock.recv(1024)
-                    data+= part
-                    # print("data", data)
-                    # print("part", part.decode())
+                    data += part
+
                     if len(part) < 1024:
                         break
                 
-                print("receiving data")
                 server_data = data
-
-                # print(server_data, type(server_data), len(server_data))
-
                 server_data = server_data.decode()
 
                 #server closed the connection - terminate the threads
@@ -228,13 +217,8 @@ class ClientRecvThread(Thread):
                     return 1
 
                 #parse the server's message into a dictionary
-                # print(server_data, type(server_data), len(server_data))
                 server_resp = json.loads(server_data)
-                # print(server_resp, type(server_resp))
-                # error here
-                print("AST LITERAL")
                 server_resp = ast.literal_eval(server_resp)
-                # print(server_resp, type(server_resp))
 
                 #check server response type for state of the response
                 #self.locked_print("Server response type: " + str(server_resp['response']))
@@ -251,11 +235,8 @@ class ClientRecvThread(Thread):
                 #handle receiving conversation history from the server
                 elif(server_resp['command'] == 'history'):
                     #destringify the message list back into a list - apply literal_eval again
-                    print("ast litreal...")
                     message_list = ast.literal_eval(server_resp['message_list'])
-                    print(message_list, type(message_list))
                     if message_list:
-                        print("calling format msg history")
                         self.format_message_history(server_resp['other_username'], message_list)
                     else:
                         self.locked_print("")

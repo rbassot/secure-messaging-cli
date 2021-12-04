@@ -13,4 +13,5 @@ shared_event.clear()
 connections = {}
 connected_username = None
 
+#User encryption class representing all needed information for correct X3DH key agreement & and AES-GCM encryption.
 username = None

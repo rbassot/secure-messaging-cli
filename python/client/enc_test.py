@@ -4,7 +4,7 @@ import os
 import time
 import json
 import sys
-sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__main\\seng360-a3\\python')
+#sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__main\\seng360-a3\\python')
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives import serialization
