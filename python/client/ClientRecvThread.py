@@ -68,7 +68,7 @@ class ClientRecvThread(Thread):
     
     def join_chat(self, other_username):
         #initial chat welcoming
-        self.locked_print("Now chatting with " + str(other_username) + ".")
+        self.locked_print('\033[1m' + "Now chatting with " + str(other_username) + "." + '\033[0m')
         self.locked_print("")
 
         #allow the SendThread to enter the chat
@@ -89,7 +89,7 @@ class ClientRecvThread(Thread):
                 message_json = ast.literal_eval(message_json)
 
                 #print out the formatted message in blue to the client console
-                if(message_json['command'] == 'message_recv'):
+                if(message_json['command'] == 'message-recv'):
                     # convert str message to hex, then to a bytes type
                     enc_msg_hex = message_json['message'].encode('utf-8')
                     enc_msg_bytes = binascii.unhexlify(enc_msg_hex)
@@ -99,6 +99,19 @@ class ClientRecvThread(Thread):
 
                     message_str = str(other_username) + ": " + str(decrypt_msg)
                     self.locked_print('\033[94m' + message_str + '\033[0m')
+
+                #server-sent notification that the chat was closed
+                elif(message_json['command'] == 'exit-chat'):
+                    self.locked_print('\033[1m' + message_json['message'] + '\033[0m')
+
+                    #reset the shared connected_username variable
+                    config.connected_username = None
+
+                    #release the blocked sender thread
+                    config.shared_event.set()
+                    config.shared_event.clear()
+                    return
+
 
             #exit chat on any exception
             except Exception as e:
@@ -138,7 +151,7 @@ class ClientRecvThread(Thread):
         #wait on SendThread to accept the request
         config.shared_event.wait()
         #create formatted response string for the server
-        resp_to_connect = "{'command':'accept_chat_req', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, self.username)
+        resp_to_connect = "{'command':'accept-chat-req', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, self.username)
         serialized_resp = json.dumps(resp_to_connect).encode()
         self.sock.send(serialized_resp)
 
@@ -186,10 +199,6 @@ class ClientRecvThread(Thread):
                 return
 
         self.locked_print("")
-        
-        #release the SendThread to ask for input again
-        config.shared_event.set()
-        config.shared_event.clear()
         return
 
 
@@ -224,12 +233,12 @@ class ClientRecvThread(Thread):
                 #self.locked_print("Server response type: " + str(server_resp['response']))
 
                 #Enter Chat Part 2 - receive chat request from a sender client
-                if(server_resp['command'] == 'req_chat_from'):
+                if(server_resp['command'] == 'req-chat-from'):
                     self.clear_screen()
                     self.accept_chat_req(server_resp['send_username'])
 
                 #Enter Chat Part 6 - receive 'new chat' response from a receiver client
-                elif(server_resp['command'] == 'chat_confirmed'):
+                elif(server_resp['command'] == 'chat-confirmed'):
                     self.confirm_chat_opened(server_resp['message'], server_resp['recv_username'])
 
                 #handle receiving conversation history from the server
@@ -242,9 +251,9 @@ class ClientRecvThread(Thread):
                         self.locked_print("")
                         self.locked_print("There is no message history with " + server_resp['other_username'] + " to be displayed.")
 
-                        #release the SendThread to ask for input again
-                        config.shared_event.set()
-                        config.shared_event.clear()
+                    #release the SendThread to ask for input again
+                    config.shared_event.set()
+                    config.shared_event.clear()
 
                 #handle deleting conversation history with a specific client from the server
                 elif(server_resp['command'] == 'delete-history'):

@@ -66,7 +66,7 @@ class ServerThread(Thread):
         None
         '''
         #Step 2 - send a request to the receiving client to establish connection
-        req_to_connect = "{'command':'req_chat_from', 'response':'SUCCESS', 'send_username':'%s', 'message':'ClientA has requested to chat!'}"%(send_username)
+        req_to_connect = "{'command':'req-chat-from', 'response':'SUCCESS', 'send_username':'%s', 'message':'ClientA has requested to chat!'}"%(send_username)
         print("Step2: " + req_to_connect)
         serialized_req = json.dumps(req_to_connect).encode()
         receiver_socket = config.connections.get(str(recv_username))
@@ -76,7 +76,7 @@ class ServerThread(Thread):
         config.shared_event.wait()
 
         #Step 6 - notify the sender client that the receiver confirmed the chat req
-        sender_conn_confirm = "{'command':'chat_confirmed', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, recv_username)
+        sender_conn_confirm = "{'command':'chat-confirmed', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, recv_username)
         serialized_confirm = json.dumps(sender_conn_confirm).encode()
 
         #confirm with the sender client that the connection is established
@@ -114,10 +114,10 @@ class ServerThread(Thread):
         #self.sock.send(recv_data)
         response = ""
         if(self.db_conn.is_registered_user(recv_username)): #FIX: also needs to check for recv account activity at the time of the request
-            response = "{'command':'chat_confirmed', 'response':'SUCCESS', 'recv_username':'%s', 'message':'Successfully connected to ClientB.'}"%(recv_username)
+            response = "{'command':'chat-confirmed', 'response':'SUCCESS', 'recv_username':'%s', 'message':'Successfully connected to ClientB.'}"%(recv_username)
 
         else:
-            response = "{'command':'chat_confirmed', 'response':'FAILURE', 'message':'Username could not be found!'}"
+            response = "{'command':'chat-confirmed', 'response':'FAILURE', 'message':'Username could not be found!'}"
 
         print("This is the response to confirm on the sender-side: " + response)
         serialized_resp = json.dumps(response).encode()
@@ -151,7 +151,7 @@ class ServerThread(Thread):
         None
         '''
         #reformat & redirect the message to the receiving client
-        forwarded_msg = "{'command':'message_recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
+        forwarded_msg = "{'command':'message-recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
         serialized_msg = json.dumps(forwarded_msg).encode()
 
         #store the encrypted message once in the DB's Message table twice - once for each owner of the message, for separate histories
@@ -166,6 +166,21 @@ class ServerThread(Thread):
         #send to the correct receiving client via its socket connection
         recv_socket = config.connections.get(str(recv_client))
         recv_socket.send(serialized_msg)
+        return
+
+
+    def handle_exit_chat(self, send_client, recv_client):
+        #send a response for chat termination to BOTH clients
+        sender_resp = "{'command':'exit-chat', 'send_username':'%s', 'recv_username':'%s', 'message':'The chat has been closed.'}"%(send_client, recv_client)
+        serialized_send_resp = json.dumps(sender_resp).encode()
+
+        receiver_resp  = "{'command':'exit-chat', 'send_username':'%s', 'recv_username':'%s', 'message':'%s has closed the chat - Hit ENTER to return to the main menu.'}"%(send_client, recv_client, send_client)
+        serialized_recv_resp = json.dumps(receiver_resp).encode()
+
+        #send both responses to each client's socket
+        self.sock.send(serialized_send_resp)
+        recv_socket = config.connections.get(str(recv_client))
+        recv_socket.send(serialized_recv_resp)
         return
 
     
@@ -327,7 +342,7 @@ class ServerThread(Thread):
         random_bytes = b'b'*1024
         try:
             #to change!!!
-            sent_size = self.sock.sendall(random_bytes + serialized_resp)
+            sent_size = self.sock.send(random_bytes + serialized_resp)
             # print("sent size:", sent_size)
         except Exception as e:
             print(e)
@@ -458,12 +473,15 @@ class ServerThread(Thread):
                 #Step 1 - receive request from sending client to establish a new chat connection
                 self.handle_new_chat(client_req['send_username'], client_req['recv_username'])
 
+            elif(client_req['command'] == 'exit-chat'):
+                self.handle_exit_chat(client_req['send_username'], client_req['recv_username'])
+
             #Step 4 - receive response from the receiver client (on ServerThread B)
-            elif(client_req['command'] == 'accept_chat_req'):
+            elif(client_req['command'] == 'accept-chat-req'):
                 self.accept_chat_request()
 
             #basic redirection of a chat message from clientA to clientB
-            elif(client_req['command'] == 'message_sent'):
+            elif(client_req['command'] == 'message-sent'):
                 self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
 
             #handle client requesting conversation history with a specific user
@@ -509,23 +527,3 @@ class ServerThread(Thread):
 
         #temporary return to terminate the thread - where will this be placed?
         return
-
-        '''
-        while True:
-            try:
-                client_data = self.sock.recv(1024)
-
-                #Image displaying with Pillow module
-                #im = Image.open(r"C:\Users\Rbass\Documents\earbuds.jpg") 
-                #im.show()
-                print("Client sent: " + client_data.decode())
-                response_msg = "You sent me some data"
-                self.sock.send(response_msg.encode())
-
-            except Exception as e:
-
-                #thread exit case
-                if(not client_data):
-                    #must handle closing connection/removing conn object
-                    break
-        '''
