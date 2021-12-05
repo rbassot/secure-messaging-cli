@@ -66,8 +66,14 @@ class ServerThread(Thread):
         None
         '''
         #Step 2 - send a request to the receiving client to establish connection
-        req_to_connect = "{'command':'req-chat-from', 'response':'SUCCESS', 'send_username':'%s', 'message':'ClientA has requested to chat!'}"%(send_username)
-        print("Step2: " + req_to_connect)
+        # req_to_connect = "{'command':'req_chat_from', 'response':'SUCCESS', 'send_username':'%s', 'message':'ClientA has requested to chat!'}"%(send_username)
+        req_to_connect = {
+            'command':"req-chat-from", 
+            'response':"SUCCESS", 
+            'send_username': send_username, 
+            'message':"ClientA has requested to chat!"
+        }
+        print("Step2: ", req_to_connect)
         serialized_req = json.dumps(req_to_connect).encode()
         receiver_socket = config.connections.get(str(recv_username))
         receiver_socket.send(serialized_req)
@@ -76,9 +82,16 @@ class ServerThread(Thread):
         config.shared_event.wait()
 
         #Step 6 - notify the sender client that the receiver confirmed the chat req
-        sender_conn_confirm = "{'command':'chat-confirmed', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, recv_username)
+        # sender_conn_confirm = "{'command':'chat_confirmed', 'response':'SUCCESS', 'send_username':'%s', 'recv_username':'%s', 'message':'The other client accepted the chat request.'}"%(send_username, recv_username)
+        # serialized_confirm = json.dumps(sender_conn_confirm).encode()
+        sender_conn_confirm = {
+            'command':'chat-confirmed', 
+            'response':'SUCCESS', 
+            'send_username':send_username, 
+            'recv_username':recv_username, 
+            'message':'The other client accepted the chat request.'
+        }
         serialized_confirm = json.dumps(sender_conn_confirm).encode()
-
         #confirm with the sender client that the connection is established
         self.sock.send(serialized_confirm)
 
@@ -151,7 +164,13 @@ class ServerThread(Thread):
         None
         '''
         #reformat & redirect the message to the receiving client
-        forwarded_msg = "{'command':'message-recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
+        # forwarded_msg = "{'command':'message_recv', 'send_username':'%s', 'recv_username':'%s', 'message':'%s'}"%(send_client, recv_client, encr_message)
+        forwarded_msg = {
+            'command':'message-recv', 
+            'send_username': send_client, 
+            'recv_username': recv_client, 
+            'message':encr_message
+        }
         serialized_msg = json.dumps(forwarded_msg).encode()
 
         #store the encrypted message once in the DB's Message table twice - once for each owner of the message, for separate histories
@@ -171,10 +190,22 @@ class ServerThread(Thread):
 
     def handle_exit_chat(self, send_client, recv_client):
         #send a response for chat termination to BOTH clients
-        sender_resp = "{'command':'exit-chat', 'send_username':'%s', 'recv_username':'%s', 'message':'The chat has been closed.'}"%(send_client, recv_client)
+        # sender_resp = "{'command':'exit-chat', 'send_username':'%s', 'recv_username':'%s', 'message':'The chat has been closed.'}"%(send_client, recv_client)
+        sender_resp = {
+            'command':'exit-chat', 
+            'send_username':send_client, 
+            'recv_username':recv_client, 
+            'message':'The chat has been closed.'
+        }
         serialized_send_resp = json.dumps(sender_resp).encode()
 
-        receiver_resp  = "{'command':'exit-chat', 'send_username':'%s', 'recv_username':'%s', 'message':'%s has closed the chat - Hit ENTER to return to the main menu.'}"%(send_client, recv_client, send_client)
+        # receiver_resp  = "{'command':'exit-chat', 'send_username':'%s', 'recv_username':'%s', 'message':'%s has closed the chat - Hit ENTER to return to the main menu.'}"%(send_client, recv_client, send_client)
+        receiver_resp = {
+            'command':'exit-chat', 
+            'send_username':send_client, 
+            'recv_username':recv_client, 
+            'message':send_client + 'has closed the chat - Hit ENTER to return to the main menu.'
+        }
         serialized_recv_resp = json.dumps(receiver_resp).encode()
 
         #send both responses to each client's socket
@@ -211,10 +242,17 @@ class ServerThread(Thread):
         #pass account info to database object for account creation
         response = ""
         if(self.db_conn.insert_new_account(client_first, client_last, client_username, client_password)):
-            response = "{'response':'SUCCESS', 'message':'Successfully created account.'}"
-
+            # response = "{'response':'SUCCESS', 'message':'Successfully created account.'}"
+            response = {
+                'response':'SUCCESS',
+                'message':'Successfully created account.'
+            }
         else:
-            response = "{'response':'FAILURE', 'message':'Account creation was not successful!'}"
+            # response = "{'response':'FAILURE', 'message':'Account creation was not successful!'}"
+            response = {
+                'response':'FAILURE',
+                'message':'Account creation was not successful!'
+            }
 
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
@@ -239,10 +277,20 @@ class ServerThread(Thread):
         #TODO: extend this to delete all OTPKs and public key bundle
         response = ""
         if(self.db_conn.delete_account(client_username) and self.db_conn.delete_all_histories(client_username)):
-            response = "{'command':'delete-account', 'response':'SUCCESS', 'message':'Successfully deleted your account information.'}"
+            # response = "{'command':'delete-account', 'response':'SUCCESS', 'message':'Successfully deleted your account information.'}"
+            response = {
+                'command':'delete-account', 
+                'response':'SUCCESS', 
+                'message':'Successfully deleted your account information.'
+            }
 
         else:
-            response = "{'command':'delete-account', 'response':'FAILURE', 'message':'Account deletion was not successful!'}"
+            # response = "{'command':'delete-account', 'response':'FAILURE', 'message':'Account deletion was not successful!'}"
+            response = {
+                'command':'delete-account', 
+                'response':'FAILURE', 
+                'message':'Account deletion was not successful!'
+            }
 
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
@@ -292,9 +340,18 @@ class ServerThread(Thread):
         #FIX!! config.auth.... to assert no duplicate connections to the same account!
         response = ""
         if(client_username not in config.authorized_users and self.db_conn.is_valid_username_password(client_username, client_password)):
-            response = "{'response':'SUCCESS', 'message':'Successfully logged in.'}"
+            # response = "{'response':'SUCCESS', 'message':'Successfully logged in.'}"
+            response = {
+                'response':'SUCCESS',
+                'message':'Successfully logged in.'
+            }
+
         else:
-            response = "{'response':'FAILURE', 'message':'Login was not successful!'}"
+            # response = "{'response':'FAILURE', 'message':'Login was not successful!'}"
+            response = {
+                'response':'FAILURE', 
+                'message':'Login was not successful!'
+            }
 
         serialized_resp = json.dumps(response).encode()
         self.sock.send(serialized_resp)
@@ -328,11 +385,18 @@ class ServerThread(Thread):
 
         #send the list of messages (could be empty!) back over to the client
         # print("entering history resp...")
-        history_resp = '''{"command":"history", "response":"SUCCESS", "message_list":"%s", "other_username":"%s", "message":"Successfully retrieved conversation history."}'''%(messages, other_username)
+        # history_resp = '''{"command":"history", "response":"SUCCESS", "message_list":"%s", "other_username":"%s", "message":"Successfully retrieved conversation history."}'''%(messages, other_username)
+        history_resp = (json.dumps({
+            'command':'history',
+            'response':'SUCCESS',
+            'message_list':messages,
+            'other_username': other_username,
+            'message': 'Successfully retrieved conversation history.'
+        })).encode()
         # history_resp = "{\'command\':\'history\', \'response\':\'SUCCESS\', \'message_list\':\'%s\', \'other_username\':\'%s\', \'message\':\'Successfully retrieved conversation history.\'}"%(messages, other_username)
         # print("entering serialized resp...")
 
-        serialized_resp = json.dumps(history_resp).encode()
+        # serialized_resp = json.dumps(history_resp).encode()
 
         # print(serialized_resp, type(serialized_resp))
         # print()
@@ -342,7 +406,7 @@ class ServerThread(Thread):
         random_bytes = b'b'*1024
         try:
             #to change!!!
-            sent_size = self.sock.send(random_bytes + serialized_resp)
+            sent_size = self.sock.send(random_bytes + history_resp)
             # print("sent size:", sent_size)
         except Exception as e:
             print(e)
@@ -375,7 +439,12 @@ class ServerThread(Thread):
             return
 
         #send confirmation of deletion back to the client
-        del_history_resp = "{'command':'delete-history', 'response':'SUCCESS', 'message':'Successfully deleted your conversation history with %s.'}"%(other_username)
+        # del_history_resp = "{'command':'delete-history', 'response':'SUCCESS', 'message':'Successfully deleted your conversation history with %s.'}"%(other_username)
+        del_history_resp = {
+            'command':'delete-history',
+            'response':'SUCCESS',
+            'message':'Successfully deleted your conversation history with.' + other_username
+        }
         serialized_resp = json.dumps(del_history_resp).encode()
         self.sock.send(serialized_resp)
         return
@@ -404,7 +473,12 @@ class ServerThread(Thread):
             return
 
         #send confirmation of deletion back to the client
-        delete_all_resp = "{'command':'delete-all-histories', 'response':'SUCCESS', 'message':'Successfully deleted all your conversation histories.'}"
+        # delete_all_resp = "{'command':'delete-all-histories', 'response':'SUCCESS', 'message':'Successfully deleted all your conversation histories.'}"
+        delete_all_resp = {
+            'command':'delete-all-histories',
+            'response':'SUCCESS',
+            'message':'Successfully deleted all your conversation histories.'
+        }
         serialized_resp = json.dumps(delete_all_resp).encode()
         self.sock.send(serialized_resp)
         return
@@ -445,7 +519,8 @@ class ServerThread(Thread):
 
             #parse the client's request
             client_req = json.loads(client_data.decode())
-            client_req = ast.literal_eval(client_req)
+            # print(client_req)
+            # client_req = ast.literal_eval(client_req)
 
             #print(isinstance(client_req, dict))
             print(client_req)
@@ -486,19 +561,19 @@ class ServerThread(Thread):
 
             #handle client requesting conversation history with a specific user
             elif(client_req['command'] == 'history'):
-                self.retrieve_history(client_req['my_username'], client_req['other_username'])
+                self.retrieve_history(client_req['send_username'], client_req['recv_username'])
 
             #handle deleting the client's history from the database
             elif(client_req['command'] == 'delete-history'):
-                self.delete_history(client_req['my_username'], client_req['other_username'])
+                self.delete_history(client_req['send_username'], client_req['recv_username'])
 
             #handle deleting ALL the client's histories from the database
             elif(client_req['command'] == 'delete-all-histories'):
-                self.delete_all_histories(client_req['my_username'])
+                self.delete_all_histories(client_req['send_username'])
 
             #handle deleting the client's account + ALL their conversation histories
             elif(client_req['command'] == 'delete-account'):
-                self.handle_account_deletion(client_req['my_username'])
+                self.handle_account_deletion(client_req['send_username'])
             
             #Shouldn't need exit handling - returning from the thread above properly cleans it up
             '''elif(client_req['command'] == 'exit'):

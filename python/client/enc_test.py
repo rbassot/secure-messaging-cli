@@ -4,7 +4,7 @@ import os
 import time
 import json
 import sys
-#sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__main\\seng360-a3\\python')
+sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__enc_msg_branch\\seng360-a3\\python')
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives import serialization
@@ -95,35 +95,38 @@ def main():
     #################################
 
     # open image and convert to bytes
-    # with open("shrek.png", "rb") as image:
-    #     b64string = base64.b64encode(image.read())
+    with open("C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__enc_msg_branch\\seng360-a3\\python\\client\\uvic.png", "rb") as image:
+        b64string = base64.b64encode(image.read())
 
-    # # convert img bytes to string
-    # img_string = b64string.decode()
+    # convert img bytes to string
+    img_string = b64string.decode()
     
 
-    # # Send image from user1 to user2
-    # print("Sending message as: ", user1.username)
-    # user1.send_msg(user2.username, img_string)
-    # print()
+    # Send image from user1 to user2
+    print("Sending message as: ", user1.username)
+    encr_picture = user1.encrypt_msg(user2.username, img_string)
+    print()
+    # print("Encrypted picture:\n\n", encr_picture)
 
-    # # Receive image as user2 from user1
-    # recv_img_string = user2.recv_msg(user1.username)
-
-    # # Encode string
-    # encoded_img_string = recv_img_string.encode()
+    # Receive image as user2 from user1
+    recv_img_string = user2.decrypt_msg(user1.username, encr_picture, False)
     
-    # # Convert encoded string to bytearray
-    # img_bytes = bytearray(encoded_img_string)
+    # Encode string
+    encoded_img_string = recv_img_string.encode()
     
-    # # Convert bytearray to .png
-    # f = io.BytesIO(base64.b64decode(img_bytes))
+    # Convert encoded string to bytearray
+    img_bytes = bytearray(encoded_img_string)
+    
+    # Convert bytearray to .png
+    f = base64.b64decode(img_bytes)
 
-    # # Save image
-    # pilimage = Image.open(f)
-    # pilimage = pilimage.save("shrek_recv.png")
-    # show_img = Image.open(pilimage)
-    # show_img.show()
+    # Save image
+    pilimage = Image.open(io.BytesIO(f))
+    save_name = "pic_recv.png"
+    pilimage = pilimage.save(save_name)
+    
+    show_img = Image.open(save_name)
+    show_img.show()
 
 
 

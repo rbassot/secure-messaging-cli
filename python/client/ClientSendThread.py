@@ -14,6 +14,11 @@ import config
 from encryption import User
 import binascii
 
+# Image conversion
+from PIL import Image
+import io
+import base64
+
 '''
 Basic ClientSendThread class for the client-side to handle user interface/interaction & send requests to the server.
 '''
@@ -235,9 +240,16 @@ class ClientSendThread(Thread):
         None
         '''
         #format the message into a server request, then serialize
-        formatted_req = "{'command':'message-sent','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
-        serialized_req = json.dumps(formatted_req).encode()
-        return serialized_req
+        # formatted_req = "{'command':'message_sent','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
+        # serialized_req = json.dumps(formatted_req).encode()
+        formatted_req = (json.dumps({
+            'command':'message-sent',
+            'send_username':self.username,
+            'recv_username':recv_username,
+            'message':message
+        })).encode()
+
+        return formatted_req
 
 
     def request_new_chat(self, recv_username):
@@ -255,13 +267,19 @@ class ClientSendThread(Thread):
         ----------
         None
         '''
-        self.clear_screen()
+        os.system('clear')
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
             #create sender-side client request
-            connect_req = "{'command':'chat','send_username':'%s','recv_username':'%s','message':'Connect with user'}"%(self.username, recv_username)
-            serialized_req = json.dumps(connect_req).encode()
-            self.sock.send(serialized_req)
+            # connect_req = "{'command':'chat','send_username':'%s','recv_username':'%s','message':'Connect with user'}"%(self.username, recv_username)
+            # serialized_req = json.dumps(connect_req).encode()
+            connect_req = (json.dumps({
+                'command':'chat',
+                'send_username':self.username,
+                'recv_username':recv_username,
+                'message':'Connect with user'
+            })).encode()
+            self.sock.send(connect_req)
 
         except:
             self.locked_print("There was an issue with sending the chat request...")
@@ -273,9 +291,6 @@ class ClientSendThread(Thread):
         #self.event.clear()
         
         #TODO: add the failure path - display error message & return to main menu
-
-        #reset the shared connected_username variable
-        config.connected_username = recv_username
 
         #sender-side user chat scenario
         self.join_chat(recv_username)
@@ -313,17 +328,6 @@ class ClientSendThread(Thread):
 
         return args[0], args[1]
 
-
-    def notify_exiting_chat(self, other_username):
-        #notify the server that the chat is being exited
-        exit_notif = "{'command':'exit-chat','send_username':'%s','recv_username':'%s','message':'Exiting the user chat.'}"%(self.username, other_username)
-        serialized_req = json.dumps(exit_notif).encode()
-        self.sock.send(serialized_req)
-
-        #wait for the response to be received in the RecvThread
-        config.shared_event.wait()
-        return
-
     
     def join_chat(self, other_username):
         '''
@@ -344,7 +348,7 @@ class ClientSendThread(Thread):
         None
         '''
         #SendThread chat message loop
-        while config.connected_username:
+        while True:
             try:
                 #get user input for writing a message to the connected user
                 #TODO: may need to avoid input() + use an event here??
@@ -356,10 +360,12 @@ class ClientSendThread(Thread):
                 #check for user exit request
                 if(user_message in ('--quit', '--quit-chat')):
                     #should notify the server on exit - to be able to notify the other client that user has dropped
-                    self.notify_exiting_chat(other_username)
                     #also must notify the RecvThread that exit was asked for - use a global flag/event?
                     self.locked_print("Exiting the chat session...")
                     break
+                # if(user_message in ('--send-image')):
+                #     # assuming picture is in the same directory
+
 
                 #encrypt the message, format & serialize, then send to server
                 encrypted_msg = self.enc_user.encrypt_msg(other_username, user_message)
@@ -401,9 +407,16 @@ class ClientSendThread(Thread):
         '''
         #ask the server to retrieve conversation history
         try:
-            req_conversation = "{'command':'history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
-            serialized_req = json.dumps(req_conversation).encode()
-            self.sock.send(serialized_req)
+            # req_conversation = "{'command':'history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
+            # serialized_req = json.dumps(req_conversation).encode()
+
+            req_conversation = (json.dumps({
+                'command':'history',
+                'send_username':self.username,
+                'recv_username':other_username,
+                'message':'Retrieve conversation history'
+            })).encode()
+            self.sock.send(req_conversation)
 
             #blocks the sender thread here until the RecvThread prints out full convo history
             config.shared_event.wait()
@@ -432,9 +445,15 @@ class ClientSendThread(Thread):
         '''
         #ask the server to delete conversation history with a specific user
         try:
-            req_deletion = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Delete a conversation history'}"%(self.username, other_username)
-            serialized_req = json.dumps(req_deletion).encode()
-            self.sock.send(serialized_req)
+            # req_deletion = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Delete a conversation history'}"%(self.username, other_username)
+            # serialized_req = json.dumps(req_deletion).encode()
+            req_deletion = (json.dumps({
+                'command':'delete-history',
+                'send_username':self.username,
+                'recv_username':other_username,
+                'message':'Delete a conversation history'
+            })).encode()
+            self.sock.send(req_deletion)
 
             #blocks the sender thread here until the RecvThread prints out confirmation of deletion
             config.shared_event.wait()
@@ -463,9 +482,14 @@ class ClientSendThread(Thread):
         '''
         #ask the server to delete all conversations owned by this client
         try:
-            req_delete_all = "{'command':'delete-all-histories', 'my_username':'%s', 'message':'Delete all conversation histories'}"%(self.username)
-            serialized_req = json.dumps(req_delete_all).encode()
-            self.sock.send(serialized_req)
+            # req_delete_all = "{'command':'delete-all-histories', 'my_username':'%s', 'message':'Delete all conversation histories'}"%(self.username)
+            # serialized_req = json.dumps(req_delete_all).encode()
+            req_delete_all = (json.dumps({
+                'command':'delete-all-histories',
+                'send_username':self.username,
+                'message':'Delete all conversation histories'
+            })).encode()
+            self.sock.send(req_delete_all)
 
             #blocks the sender thread here until the RecvThread prints out confirmation of histories deletion
             config.shared_event.wait()
@@ -494,9 +518,14 @@ class ClientSendThread(Thread):
         '''
         #ask the server to delete my account & accompanying message histories
         try:
-            req_delete_account = "{'command':'delete-account', 'my_username':'%s', 'message':'Delete my account.'}"%(self.username)
-            serialized_req = json.dumps(req_delete_account).encode()
-            self.sock.send(serialized_req)
+            # req_delete_account = "{'command':'delete-account', 'my_username':'%s', 'message':'Delete my account.'}"%(self.username)
+            # serialized_req = json.dumps(req_delete_account).encode()
+            req_delete_account = (json.dumps({
+                'command':'message-sent',
+                'send_username':self.username,
+                'message':'Delete my account'
+            })).encode()
+            self.sock.send(req_delete_account)
 
             #blocks the sender thread here until the RecvThread prints out confirmation of account deletion
             config.shared_event.wait()
