@@ -137,7 +137,7 @@ class ServerThread(Thread):
         self.sock.send(serialized_resp)'''
 
 
-    def handle_send_message(self, send_client, recv_client, encr_message, image_attached=None):
+    def handle_send_message(self, send_client, recv_client, encr_message, image_attached):
         '''
         Server-side sending of a message from one client to another. The receiver client's
         socket object is found in the shared config file, and used to forward the sent message.
@@ -158,6 +158,9 @@ class ServerThread(Thread):
 
         encr_message: str
             The AES-GCM encrypted message, in string format.
+        
+        image_attached: boolean
+            True if encr_message is a picture, otherwise False.
 
         Returns
         ----------
@@ -169,7 +172,8 @@ class ServerThread(Thread):
             'command':'message-recv', 
             'send_username': send_client, 
             'recv_username': recv_client, 
-            'message':encr_message
+            'message':encr_message,
+            'image_attached': image_attached
         }
         serialized_msg = json.dumps(forwarded_msg).encode()
 
@@ -502,9 +506,16 @@ class ServerThread(Thread):
         None
         '''
         while True:
+            data = b''
+            part = b''
             try:
-                client_data = self.sock.recv(1024)
+                while True:
+                    part = self.sock.recv(1024)
+                    data += part
 
+                    if len(part) < 1024:
+                        break
+                client_data = data
             except:
                 pass
 
@@ -557,7 +568,7 @@ class ServerThread(Thread):
 
             #basic redirection of a chat message from ClientA to ClientB
             elif(client_req['command'] == 'message-sent'):
-                self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
+                self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], client_req['is_picture']) #How do we handle image?
 
             #handle client requesting conversation history with a specific user
             elif(client_req['command'] == 'history'):

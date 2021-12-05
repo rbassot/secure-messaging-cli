@@ -16,6 +16,7 @@ from server.DatabaseConnection import DatabaseConn
 from PIL import Image
 import io
 import base64
+import binascii
 
 def main():
     print("----- Testing Encryption Implementation -----")
@@ -95,16 +96,25 @@ def main():
     #################################
 
     # open image and convert to bytes
-    with open("C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__enc_msg_branch\\seng360-a3\\python\\client\\uvic.png", "rb") as image:
+    with open("C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__enc_msg_branch\\seng360-a3\\uvic.png", "rb") as image:
         b64string = base64.b64encode(image.read())
+        print("b64string:\n ", b64string)
 
-    # convert img bytes to string
-    img_string = b64string.decode()
+    # convert img bytes to str
+    to_hex = binascii.hexlify(b64string)
+    print("to_hex:\n    ", to_hex)
+    to_str = to_hex.decode()
+    print("str_enc_msg:\n   ", to_str)
+
+
+    # # convert img bytes to string
+    # img_string = b64string.decode()
+    # print("img_string:\n    ", img_string)
     
 
     # Send image from user1 to user2
     print("Sending message as: ", user1.username)
-    encr_picture = user1.encrypt_msg(user2.username, img_string)
+    encr_picture = user1.encrypt_msg(user2.username, to_str)
     print()
     # print("Encrypted picture:\n\n", encr_picture)
 
@@ -112,21 +122,24 @@ def main():
     recv_img_string = user2.decrypt_msg(user1.username, encr_picture, False)
     
     # Encode string
-    encoded_img_string = recv_img_string.encode()
+    print("recv_img_string:\n   ", recv_img_string)
+    encoded_img_str = recv_img_string.encode()
     
-    # Convert encoded string to bytearray
-    img_bytes = bytearray(encoded_img_string)
+    # Convert encoded str to bytes
+    img_bytes = binascii.unhexlify(encoded_img_str)
+    print("img_bytes:\n ", img_bytes)
     
     # Convert bytearray to .png
     f = base64.b64decode(img_bytes)
+    print("f:\n ", f)
 
     # Save image
     pilimage = Image.open(io.BytesIO(f))
     save_name = "pic_recv.png"
     pilimage = pilimage.save(save_name)
     
-    show_img = Image.open(save_name)
-    show_img.show()
+    # show_img = Image.open(save_name)
+    # show_img.show()
 
 
 

@@ -221,7 +221,7 @@ class ClientSendThread(Thread):
         return
 
     
-    def serialize_chat_message(self, message, recv_username):
+    def serialize_chat_message(self, message, recv_username, is_picture):
         '''
         Serializes chat messages to be sent to the server, then redirected
         to the receiver-side client. Serializing involves formatting the
@@ -234,6 +234,9 @@ class ClientSendThread(Thread):
 
         recv_username: str
             The intended receiver-side client's username.
+        
+        is_picture: boolean
+            True if sending a picture, false otherwise.
 
         Returns
         ----------
@@ -246,7 +249,8 @@ class ClientSendThread(Thread):
             'command':'message-sent',
             'send_username':self.username,
             'recv_username':recv_username,
-            'message':message
+            'message':message,
+            'is_picture':is_picture
         })).encode()
 
         return formatted_req
@@ -394,19 +398,43 @@ class ClientSendThread(Thread):
                     #also must notify the RecvThread that exit was asked for - use a global flag/event?
                     self.locked_print("Exiting the chat session...")
                     break
-                # if(user_message in ('--send-image')):
-                #     # assuming picture is in the same directory
+                if(user_message == '--send-image'):
+                    # assuming picture is in the same directory
+                    # open img and covert to bytes
+                    print("Type the picture name and its extension, e.g. picture_name.png")
+                    path = self.locked_input("")
 
+                    # open image and get base64 bytes
+                    with open(path, "rb") as image:
+                        img_b64 = base64.b64encode(image.read())
+                    
+                    # parse image b64 bytes to str
+                    to_hex = binascii.hexlify(img_b64)
+                    img_string = to_hex.decode()
+                    
+                    # encrypt img
+                    encrypted_img = self.enc_user.encrypt_msg(other_username, img_string)
 
-                #encrypt the message, format & serialize, then send to server
-                encrypted_msg = self.enc_user.encrypt_msg(other_username, user_message)
-                
-                # converting enc msg bytes to str
-                to_hex = binascii.hexlify(encrypted_msg)
-                str_enc_msg = to_hex.decode()
+                    # parse encrypted_img type to str
+                    enc_img_to_hex = binascii.hexlify(encrypted_img)
+                    enc_img_str = enc_img_to_hex.decode()
 
-                serialized_req = self.serialize_chat_message(str_enc_msg, other_username)
-                self.sock.send(serialized_req)
+                    # send img
+                    serialized_req = self.serialize_chat_message(enc_img_str, other_username, "true")
+                    self.sock.send(serialized_req)
+
+                else:
+                    # regular message
+                    #encrypt the message, format & serialize, then send to server
+                    encrypted_msg = self.enc_user.encrypt_msg(other_username, user_message)
+                    
+                    # converting enc msg bytes to str
+                    to_hex = binascii.hexlify(encrypted_msg)
+                    str_enc_msg = to_hex.decode()
+
+                    serialized_req = self.serialize_chat_message(str_enc_msg, other_username, "false")
+                    self.sock.send(serialized_req)
+
 
                 #finally, print the client's own message to its own chat window
                 self.locked_print("\033[A\033[A")

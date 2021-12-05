@@ -15,6 +15,10 @@ import config
 from encryption import User
 import binascii
 
+# Image conversion
+from PIL import Image
+import io
+import base64
 '''
 Basic ClientRecvThread class for the client-side to continually listen to the server.
 '''
@@ -134,7 +138,19 @@ class ClientRecvThread(Thread):
         #listen to the chat and handle incoming messages
         while True: #test if an event trigger is needed to break out of this loop
             try:
-                message_data = self.sock.recv(1024).decode()
+                data = b''
+                part = b''
+
+                while True:
+                    part = self.sock.recv(1024)
+                    data += part
+
+                    if len(part) < 1024:
+                        break
+                
+                message_data = data
+                # print("message_data", message_data)
+                # message_data = self.sock.recv(1024).decode()
 
                 #chat connection was closed - stop listening
                 if not(message_data):
@@ -146,15 +162,29 @@ class ClientRecvThread(Thread):
 
                 #print out the formatted message in blue to the client console
                 if(message_json['command'] == 'message-recv'):
+                    
                     # convert str message to hex, then to a bytes type
                     enc_msg_hex = message_json['message'].encode('utf-8')
                     enc_msg_bytes = binascii.unhexlify(enc_msg_hex)
 
                     # decrypt the AESGCM-encrypted message
-                    decrypt_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
+                    decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
 
-                    message_str = str(other_username) + ": " + str(decrypt_msg)
-                    self.locked_print('\033[94m' + message_str + '\033[0m')
+                    if(message_json['image_attached'] == "true"):
+                        encoded_img_string = decrypted_msg.encode('utf-8')
+                        # convert img str to base64 bytes
+                        img_bytes = binascii.unhexlify(encoded_img_string)
+                        f = base64.b64decode(img_bytes)
+
+                        # convert b64 to .png
+                        pilimage = Image.open(io.BytesIO(f))
+                        save_name = "pic_recv.png"
+                        pilimage = pilimage.save(save_name)
+                        self.locked_print('\033[94m' + "Image saved as: " + save_name + '\033[0m')
+
+                    else:
+                        message_str = str(other_username) + ": " + str(decrypted_msg)
+                        self.locked_print('\033[94m' + message_str + '\033[0m')
 
                 #server-sent notification that the chat was closed
                 elif(message_json['command'] == 'exit-chat'):

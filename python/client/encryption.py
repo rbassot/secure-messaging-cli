@@ -3,7 +3,7 @@
 import os
 import sys
 from typing import final
-sys.path.append('C:\\Users\\Rbass\\uvic\\seng360\\seng360-a3\\python')
+sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__enc_msg_branch\\seng360-a3\\python')
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ed25519
