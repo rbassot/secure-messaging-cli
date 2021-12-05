@@ -9,12 +9,14 @@ import os
 from time import *
 import json
 import ast
+import binascii
 
 import config
 
 from ClientSendThread import ClientSendThread
 from ClientRecvThread import ClientRecvThread
 
+from cryptography.hazmat.primitives import hashes
 
 #----- Client Parameters -----
 SERVER_HOST = '127.0.0.1'                    #bind to public IP
@@ -38,15 +40,37 @@ def register_attempt():
     password = input("Password: ")
 
     try:
+        # start pass encryption
+        reg_digest = hashes.Hash(hashes.SHA256())
+        # generate random 16 byte salt
+        salt = os.urandom(16)
+        # calc hash from password
+        reg_digest.update(password.encode('utf-8'))
+        hash_pass = reg_digest.finalize()
+        # append salt to hash
+        hash_pass += salt  # cant convert to str
+        salt = None
+        # parse encrypted_pass to str format and send to server
+        hash_pass_bytes = binascii.hexlify(hash_pass)
+        hash_pass_str = hash_pass_bytes.decode()
+
         #send formatted login data to server
-        login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, password)
+        # login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, hash_pass_str)
+        login_req = (json.dumps({
+            'command':'register', 
+            'first':first_name,
+            'last':last_name,
+            'username':username, 
+            'password':hash_pass_str
+        })).encode()
+        # login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, password)
         #must encrypt the login data here (encryption manager?)
-        serialized_req = json.dumps(login_req).encode()
-        sock.send(serialized_req)
+        # serialized_req = json.dumps(login_req).encode()
+        sock.send(login_req)
 
         #receive response from server
         server_resp = json.loads(sock.recv(1024).decode())
-        server_resp = ast.literal_eval(server_resp)
+        # server_resp = ast.literal_eval(server_resp)
         print("Server response type: " + str(server_resp['response']))
 
         if(server_resp['response'] == 'SUCCESS'):
@@ -70,14 +94,19 @@ def login_attempt():
 
     try:
         #send formatted login data to server
-        login_req = "{'command':'login', 'username':'%s', 'password':'%s'}"%(username, password)
+        # login_req = "{'command':'login', 'username':'%s', 'password':'%s'}"%(username, password)
+        login_req = (json.dumps({
+            'command':'login', 
+            'username':username, 
+            'password':password
+        })).encode()
         #must encrypt the login data here (encryption manager?)
-        serialized_req = json.dumps(login_req).encode()
-        sock.send(serialized_req)
+        # serialized_req = json.dumps(login_req).encode()
+        sock.send(login_req)
 
         #receive response from server
         server_resp = json.loads(sock.recv(1024).decode())
-        server_resp = ast.literal_eval(server_resp)
+        # server_resp = ast.literal_eval(server_resp)
         print("Server response type: " + str(server_resp['response']))
 
         if(server_resp['response'] == 'SUCCESS'):
@@ -192,9 +221,9 @@ def start_client():
         #user has logged in: create 2 threads - one for sending, one for receiving
         global threads
         send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
-        threads.append(send_thread)
+        #threads.append(send_thread)
         recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
-        threads.append(recv_thread)
+        #threads.append(recv_thread)
 
         #set threads to daemons for auto cleanup on program exit
         send_thread.daemon = True
@@ -211,6 +240,12 @@ def start_client():
 
                 #return to login menu scope
                 print("Logging out of " + client_username)
+
+                # clear config files for next user
+                config.shared_event.clear()
+                config.connections = {}
+                config.connected_username = None
+                config.username = None
                 break
 
             #exit program - daemon threads are cleaned up automatically

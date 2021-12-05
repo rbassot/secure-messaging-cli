@@ -16,6 +16,22 @@ client_keys = {}    #dictionary of client keys needed for user authorization
 
 
 def start_server():
+    '''
+    Start the main server thread to accept client connections. This thread accepts
+    TCP socket connections over Port 50007. This function spawns child threads
+    (SendThread) that are dedicated to handling the requests of a single client.
+
+    An initial connection message is also sent to the client-side.
+    This main thread never terminates, and must be terminated from the console.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    ----------
+    None
+    '''
 
     #create socket connection
     sock = socket(AF_INET, SOCK_STREAM)

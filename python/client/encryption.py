@@ -1,10 +1,9 @@
 #!usr/bin/env python3
 
 import os
-import json
 import sys
 from typing import final
-sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\branch\\__main\\seng360-a3\\python')
+sys.path.append('C:\\Users\\rodri\\Documents\\School\\SENG 360\\__project\\_enc_msg_branch\\seng360-a3\\python')
 
 from cryptography.hazmat.primitives.asymmetric import x25519
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -13,7 +12,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, InvalidTag
 from server.DatabaseConnection import DatabaseConn
 
 MAX_ONE_TIME_PREKEY = 100   # Num of one-time prekeys stored in server
@@ -43,6 +42,8 @@ class User():
         
         self.secret_OTPK = []
         self.public_OTPK = []
+
+        self.AESGCM = []
 
         # generates OneTime Prekeys and sends to the server.
         self.generate_OTPK()
@@ -130,6 +131,7 @@ class User():
 
         # Encrypt payload
         AESGCM_KEY = AESGCM(shared_key)
+        self.AESGCM.append((receiver, AESGCM_KEY))
         nonce = os.urandom(12)
         ciphertext = AESGCM_KEY.encrypt(nonce=nonce, data=payload, associated_data=None)
         tag = ciphertext[-16:]
@@ -145,6 +147,25 @@ class User():
         # print()
         # print("     Message Sent:   ", message)
         # print()
+
+    # def decrypt_own_msg(self, encrypted_msg, receiver):
+    #     NONCE_START = 96
+    #     NONCE_FIN = NONCE_START + 12
+    #     TAG_FIN = NONCE_FIN + 16
+
+    #     nonce = encrypted_msg[NONCE_START: NONCE_FIN]
+    #     tag = encrypted_msg[NONCE_FIN: TAG_FIN]
+    #     ciphertext = encrypted_msg[TAG_FIN:]
+
+    #     for i in range(len(self.AESGCM)):
+    #         if(self.AESGCM[i][0] == receiver):
+    #             AESGCM_KEY = self.AESGCM[i][1]
+    #             payload = AESGCM_KEY.decrypt(nonce, ciphertext, None)
+    #             msg_contents = payload[128:]
+    #             decrypted_msg = msg_contents.decode()
+    #             return decrypted_msg
+        
+
 
 
     def calc_sk(self, key_material) -> bytes:
@@ -217,7 +238,7 @@ class User():
 
 
     # def recv_msg(self, sender):
-    def decrypt_msg(self, sender, encrypted_msg):
+    def decrypt_msg(self, sender, encrypted_msg, is_own_msg):
         '''
         Calculates a shared key using the first 124 bytes of the encrypted_msg, 
         then tries to decrypt message using the calculated shared key.
@@ -229,99 +250,126 @@ class User():
         OTPK_FIN = 96
         NONCE_FIN = OTPK_FIN + 12
         TAG_FIN = NONCE_FIN + 16
-        
-        # Retrive sender's key bundle from server
-        sender_key_bundle = None
-        # if self.has_key_bundle(sender) is False:
-        #     print("Could not retreive <", sender, "> key bundle")
-        self.has_key_bundle(sender)
-        
-        sender_key_bundle = self.key_bundles[sender]
-        
-        # Retrive sender's key bundle from msg
-        msg_public_IK = encrypted_msg[:IK_FIN]
-        msg_public_EK = encrypted_msg[IK_FIN: EK_FIN]
-        msg_public_OTPK = encrypted_msg[EK_FIN:OTPK_FIN]
-        msg_nonce = encrypted_msg[OTPK_FIN: NONCE_FIN]
-        msg_tag = encrypted_msg[NONCE_FIN: TAG_FIN]
-        msg_ciphertext = encrypted_msg[TAG_FIN:]
-        
-        # Find msg secret OTPK pair from public OTPK
-        secret_OTPK = None
-        for i in range(len(self.secret_OTPK)):
-            tmp_public_OTPK = self.get_bytes(self.secret_OTPK[i][1], False)
-            if(msg_public_OTPK == tmp_public_OTPK):
-                secret_OTPK = self.secret_OTPK[i][0]
-                break
-        
-        if secret_OTPK is None:
-            print("ERROR - Cannot find private OneTimePrekey used!")
+
+        if is_own_msg:
+            # decrypt own message
+            NONCE_START = OTPK_FIN
+            nonce = encrypted_msg[NONCE_START: NONCE_FIN]
+            tag = encrypted_msg[NONCE_FIN: TAG_FIN]
+            ciphertext = encrypted_msg[TAG_FIN:]
+            payload = None
+
+            # print("OWN MSG:", encrypted_msg)
+
+            for i in range(len(self.AESGCM)):
+                if(self.AESGCM[i][0] == sender):
+                    try:
+                        AESGCM_KEY = self.AESGCM[i][1]
+                        # print("aesgcm key:", AESGCM_KEY)
+                        payload = AESGCM_KEY.decrypt(nonce, ciphertext, None)
+                        # print(payload, type(payload), len(payload))
+                    except InvalidTag as e:
+                        continue
+                    msg_contents = payload[128:]
+                    decrypted_msg = msg_contents.decode()
+                    return decrypted_msg
+
+            print("ERROR - Can't find AESGCM Key")
             return
 
-
-        # Calculate key material - applying reverse X3DH
-        sender_IK = self.get_pub_key(msg_public_IK, False)
-        sender_EK = self.get_pub_key(msg_public_EK, False)
-
-        DH1 = self.secret_SPK.exchange(sender_IK)
-        DH2 = self.secret_IK.exchange(sender_EK)
-        DH3 = self.secret_SPK.exchange(sender_EK)
-        DH4 = secret_OTPK.exchange(sender_EK)
-
-        key_material = HKDF_F + DH1 + DH2 + DH3 + DH4
-
-        DH1 = None
-        DH2 = None
-        DH3 = None
-        DH4 = None
-
-        # Calculate shared_key using reverse X3DH key meterial
-        shared_key = self.calc_sk(key_material)
-
-        # Decrypt msg
-        AESGCM_KEY = AESGCM(shared_key)
-        payload = AESGCM_KEY.decrypt(msg_nonce, msg_ciphertext, None)
-
-        # Check if decrypted has correct size
-        if(len(payload) < 128):
-            print("ERROR - Could not decrypt message")
-            return
-
-        # Deconstruct payload and extract info
-        msg_signature = payload[:64]
-        msg_ad = payload[64:128]
-        msg_contents = payload[128:]
+        else:
+            # Retrive sender's key bundle from server
+            sender_key_bundle = None
+            # if self.has_key_bundle(sender) is False:
+            #     print("Could not retreive <", sender, "> key bundle")
+            self.has_key_bundle(sender)
+            
+            sender_key_bundle = self.key_bundles[sender]
+            
+            # Retrive sender's key bundle from msg
+            msg_public_IK = encrypted_msg[:IK_FIN]
+            msg_public_EK = encrypted_msg[IK_FIN: EK_FIN]
+            msg_public_OTPK = encrypted_msg[EK_FIN:OTPK_FIN]
+            msg_nonce = encrypted_msg[OTPK_FIN: NONCE_FIN]
+            msg_tag = encrypted_msg[NONCE_FIN: TAG_FIN]
+            msg_ciphertext = encrypted_msg[TAG_FIN:]
         
+            # Find msg secret OTPK pair from public OTPK
+            secret_OTPK = None
+            for i in range(len(self.secret_OTPK)):
+                tmp_public_OTPK = self.get_bytes(self.secret_OTPK[i][1], False)
+                if(msg_public_OTPK == tmp_public_OTPK):
+                    secret_OTPK = self.secret_OTPK[i][0]
+                    break
+            
+            if secret_OTPK is None:
+                print("ERROR - Cannot find private OneTimePrekey used!")
+                return
 
-        # Check if encrypted msg AD matches server AD;  AD = sender_IK + recv_IK
-        sender_IK_bytes = self.get_bytes(sender_key_bundle['IK'], False)
-        recv_IK_bytes = self.get_bytes(self.public_IK, False)
 
-        if(msg_ad != sender_IK_bytes + recv_IK_bytes):
-            print("ERROR - Identity Keys don't match!")
-            return
+            # Calculate key material - applying reverse X3DH
+            sender_IK = self.get_pub_key(msg_public_IK, False)
+            sender_EK = self.get_pub_key(msg_public_EK, False)
 
-        # Verify signature and ensure key msg and key comb is intact
-        key_combination = msg_public_IK + msg_public_EK + msg_public_OTPK
+            DH1 = self.secret_SPK.exchange(sender_IK)
+            DH2 = self.secret_IK.exchange(sender_EK)
+            DH3 = self.secret_SPK.exchange(sender_EK)
+            DH4 = secret_OTPK.exchange(sender_EK)
 
-        try:
-            sender_key_bundle['ED'].verify(msg_signature, key_combination + msg_contents)
-        except InvalidSignature as err:
-            return err
-        
-        # msg is decrypted + intact
-        # TODO - Delete SECRET OneTimePrekeys - https://signal.org/docs/specifications/x3dh/#receiving-the-initial-message
-        # Must delete public keys but can keep secret keys for a little bit
+            key_material = HKDF_F + DH1 + DH2 + DH3 + DH4
 
-        # Decode message - currently in bytes
-        decrypted_msg = msg_contents.decode()
-        # msg = json.loads(decoded_msg)
+            DH1 = None
+            DH2 = None
+            DH3 = None
+            DH4 = None
 
-        # print()
-        # print("     Message Received:   ", msg['msg'])
-        # print()
-        # return msg['msg']
-        return decrypted_msg
+            # Calculate shared_key using reverse X3DH key meterial
+            shared_key = self.calc_sk(key_material)
+
+            # Decrypt msg
+            AESGCM_KEY = AESGCM(shared_key)
+            payload = AESGCM_KEY.decrypt(msg_nonce, msg_ciphertext, None)
+
+            # Check if decrypted has correct size
+            if(len(payload) < 128):
+                print("ERROR - Could not decrypt message")
+                return
+
+            # Deconstruct payload and extract info
+            msg_signature = payload[:64]
+            msg_ad = payload[64:128]
+            msg_contents = payload[128:]
+            
+
+            # Check if encrypted msg AD matches server AD;  AD = sender_IK + recv_IK
+            sender_IK_bytes = self.get_bytes(sender_key_bundle['IK'], False)
+            recv_IK_bytes = self.get_bytes(self.public_IK, False)
+
+            if(msg_ad != sender_IK_bytes + recv_IK_bytes):
+                print("ERROR - Identity Keys don't match!")
+                return
+
+            # Verify signature and ensure key msg and key comb is intact
+            key_combination = msg_public_IK + msg_public_EK + msg_public_OTPK
+
+            try:
+                sender_key_bundle['ED'].verify(msg_signature, key_combination + msg_contents)
+            except InvalidSignature as err:
+                return err
+            
+            # msg is decrypted + intact
+            # TODO - Delete SECRET OneTimePrekeys - https://signal.org/docs/specifications/x3dh/#receiving-the-initial-message
+            # Must delete public keys but can keep secret keys for a little bit
+
+            # Decode message - currently in bytes
+            decrypted_msg = msg_contents.decode()
+            # msg = json.loads(decoded_msg)
+
+            # print()
+            # print("     Message Received:   ", msg['msg'])
+            # print()
+            # return msg['msg']
+            return decrypted_msg
 
 
         ##### Sanity Check #####

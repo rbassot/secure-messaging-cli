@@ -8,6 +8,9 @@ import json
 import ast
 #from PIL import Image
 
+import binascii
+from cryptography.hazmat.primitives import hashes
+
 '''
 Database Connection class to handle communication from a server thread to the server's database resource (SQLite3 DB).
 '''
@@ -79,13 +82,28 @@ class DatabaseConn():
             return 0
 
 
+    def delete_account(self, client_username):
+        #delete a specific account from Account table
+        try:
+            cursor = self.db_connection.cursor()
+            data = [client_username]
+            query = "DELETE FROM Account WHERE username LIKE ?"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("DELETE ACCOUNT ERROR: " + str(e))
+            return 0
+
+
     def insert_new_message(self, owner_username, send_username, recv_username, encr_message):
         #get row count for ID field
         try:
             cursor = self.db_connection.cursor()
-            row_count = self.get_Message_row_count()
-            data = [row_count + 1, owner_username, send_username, recv_username, encr_message]
-            query = "INSERT INTO Message(id, owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?, ?)"
+            #row_count = self.get_Message_row_count()
+            data = [owner_username, send_username, recv_username, encr_message]
+            query = "INSERT INTO Message(owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?)"
             cursor.execute(query, data)
             self.db_connection.commit()
             return 1
@@ -137,10 +155,11 @@ class DatabaseConn():
             print("DELETE OneTimePrekey ERROR: " + str(e))
             return 0
 
+
     def get_message_history(self, send_username, recv_username):
         cursor = self.db_connection.cursor()
-        data = [send_username]
-        query = "SELECT * FROM 'Message' WHERE owned_username LIKE ?"
+        data = [send_username, recv_username, recv_username]
+        query = "SELECT * FROM 'Message' WHERE owned_username LIKE ? AND (send_username LIKE ? OR recv_username LIKE ?)"
         cursor.execute(query, data)
         messages = cursor.fetchall()
         return messages
@@ -179,18 +198,45 @@ class DatabaseConn():
     def is_valid_username_password(self, username, password):
         try:
             cursor = self.db_connection.cursor()
-            data = [username, password]
-            query = "SELECT * FROM Account WHERE username = ? AND password = ?"
+            data = [username]
+            query = "SELECT * FROM Account WHERE username = ?"
             cursor.execute(query, data)
-            entries_matched = len(cursor.fetchall())
-            print("Amount of tuples returned: " + str(entries_matched))
+            entry = cursor.fetchall()
+            entries_matched = len(entry)
 
             #check that there is exactly one entry matching the user/pass pair
             if(entries_matched != 1):
                 return 0
 
-            #login successful
-            else: return 1
+            # login successful
+            # password hashing process:
+            #   - passwords are SHA256 hashed, then a random 16-byte salt value is appended
+            #   - passwords are stored at-rest in hashed form
+            else:
+                # get password hash from server - format is entry[0] = (id, f_name, l_name, username, enc_pass)
+                # registration password is hashed then stored in the server as a str
+                # convert pass hash str to bytes
+                server_hash_bytes = entry[0][4].encode('utf-8')
+                # convert bytes to hash format
+                server_hash_pass = binascii.unhexlify(server_hash_bytes)
+
+                # get salt from server hash
+                salt = server_hash_pass[-16:]
+
+                # calculate hash using given password
+                login_digest = hashes.Hash(hashes.SHA256())
+                login_digest.update(password.encode('utf-8'))
+                login_hash_pass = login_digest.finalize()
+                # append salt to hash
+                login_hash_pass += salt
+                salt = None
+                
+                # compare server hash and login hash
+                if(server_hash_pass == login_hash_pass):
+                    return 1    
+                else:
+                    return 0
+
 
         except Exception as e:
             print("LOGIN CHECK ERROR: " + str(e))
@@ -204,7 +250,6 @@ class DatabaseConn():
             query = "SELECT * FROM Account WHERE username = ?"
             cursor.execute(query, data)
             entries_matched = len(cursor.fetchall())
-            #print("Amount of tuples returned: " + str(entries_matched))
 
             #check that there is exactly one entry matching the desired username
             if(entries_matched != 1):
@@ -236,12 +281,13 @@ class DatabaseConn():
         #safely check if table is already created before creating it
         cursor = self.db_connection.cursor()
         query = '''CREATE TABLE IF NOT EXISTS Message(
-                    id INTEGER NOT NULL PRIMARY KEY,
-                    owned_username TEXT NOT NULL,
-                    send_username TEXT NOT NULL,
-                    recv_username TEXT NOT NULL,
-                    encr_message TEXT)
-                    '''
+                        owned_username TEXT NOT NULL,
+                        send_username TEXT NOT NULL,
+                        recv_username TEXT NOT NULL,
+                        encr_message TEXT,
+                        PRIMARY KEY(owned_username, encr_message)
+                    )
+                '''
         #Do we need to store any keys here??
         cursor.execute(query)
         self.db_connection.commit()
