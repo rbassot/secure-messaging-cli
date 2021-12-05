@@ -27,10 +27,11 @@ class ClientRecvThread(Thread):
         self.username = username
         self.enc_user = None
 
-        if(config.username == None):
-            config.username = User(username)
-
-        self.enc_user = config.username
+        if(not config.username):
+            self.enc_user = User(username)
+            config.username = self.enc_user
+        else:
+            self.enc_user = config.username
 
     
     #Function to acquire shared resource (stdout file descriptor) before printing to screen

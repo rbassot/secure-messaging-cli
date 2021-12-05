@@ -20,6 +20,34 @@ Basic ClientSendThread class for the client-side to handle user interface/intera
 
 class ClientSendThread(Thread):
     def __init__(self, socket, address, username):    #Inherit from Thread class
+        '''
+        Initializes a ClientSendThread instance as a subclass of threading.Thread.
+        This thread handles client input, and outgoing requests to the server.
+        Once initialized, the thread begins execution inside self.run(), which
+        is called by the main thread (parent).
+
+        Attributes
+        ----------
+        self.sock: socket.socket
+            The server's socket connection object.
+
+        self.addr: socket.AF_INET
+            The server's IPv4 address that they are connected from. 
+
+        self.username: str
+            The username of the logged-in client account.
+
+        self.exception: Exception
+            Holds an exception that can be raised to the scope of the main thread.
+
+        self.enc_user: encryption.User
+            An instance of encryption.User class that handles both X3DH key exchange,
+            and AES-GCM message encryption/decryption.
+
+        Returns
+        ----------
+        None
+        '''
         Thread.__init__(self) #provide a common event for interthread communication between send/receive threads
         self.sock = socket
         self.addr = address
@@ -28,14 +56,32 @@ class ClientSendThread(Thread):
         self.exception = None
         self.enc_user = None
 
-        if(config.username == None):
-            config.username = User(username)
-
-        self.enc_user = config.username
+        if(not config.username):
+            self.enc_user = User(username)
+            config.username = self.enc_user
+        else:
+            self.enc_user = config.username
 
 
     #Override: to be able to pass the exception to the called thread (main)
     def join(self):
+        '''
+        Function override to be able to pass an exception to the caller thread
+        (main thread), which can be handled in the parent scope. This is a workaround
+        to be able to gracefully terminate the program by catching an exception
+        in the parent.
+
+        Thread.join() is blocking until the working thread returns or exits in any
+        form, normally through correct behaviour returning from run().
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''
         Thread.join(self)
 
         #re-raise the caught exception for the caller thread
@@ -43,8 +89,25 @@ class ClientSendThread(Thread):
             raise self.exception
 
     
-    #Function to acquire shared resource (stdout file descriptor) before printing to screen
     def locked_print(self, message_str):
+        '''
+        Print function to handle the shared resource of stdout file descriptor.
+        The Lock object is instantiated once and shared in the config file among
+        both client threads. This lock must be acquired by a running thread before
+        that thread can print any content to the screen. Once work is complete,
+        the lock is released and can be acquired by any other thread.
+
+        Solves the Producer/Consumer resource contention problem.
+
+        Parameters
+        ----------
+        message_str: str
+            The desired message to be printed to the console.
+
+        Returns
+        ----------
+        None
+        '''
         try:
             config.lock.acquire()
             print(message_str)
@@ -56,9 +119,22 @@ class ClientSendThread(Thread):
             return
 
 
-    #Function to acquire shared resource (stdin file descriptor) before receiving user input
     def locked_input(self, prompt):
-        #if the sender thread is the only thread using stdin, do we need to lock on input?
+        '''
+        Input function to receive user input. This function no longer uses a lock
+        due to blocking issues in threads. Therefore it acts as a regular Python
+        input() function.
+
+        Parameters
+        ----------
+        prompt: str
+            The prompt to show the user while asking for their input.
+
+        Returns
+        ----------
+        user_input: str
+            The user's input string.
+        '''
         try:
             #config.lock.acquire()
             user_input = input(prompt)
@@ -71,11 +147,37 @@ class ClientSendThread(Thread):
 
 
     def clear_screen(self):
+        '''
+        Function to clear the screen (stdout) for a running client. Checks
+        whether the machine is running Windows or Linux, and then clears
+        the screen appropriately.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''
         os.system('cls' if os.name == 'nt' else 'clear')
         return
 
 
     def display_options(self):
+        '''
+        Function to display all main-menu user options for a client. Strings
+        are formatted for the console. User commands all begin with a double
+        dash delimiter.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''
         #main menu introduction
         self.locked_print("")
         self.locked_print("----- Welcome to the main menu -----")
@@ -95,6 +197,18 @@ class ClientSendThread(Thread):
 
 
     def close_server_conn(self):
+        '''
+        Closes the active connection with the server. The Socket object is
+        shutdown and closed. Eventually returns scope to the main caller thread.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''
         #notify the server that connection should be terminated
         self.sock.shutdown(SHUT_RDWR)
         self.sock.close()
@@ -103,21 +217,44 @@ class ClientSendThread(Thread):
 
     
     def serialize_chat_message(self, message, recv_username):
+        '''
+        Serializes chat messages to be sent to the server, then redirected
+        to the receiver-side client. Serializing involves formatting the
+        message as a request, and converting to a bytes-type object.
+
+        Parameters
+        ----------
+        message: str
+            The message to be serialized.
+
+        recv_username: str
+            The intended receiver-side client's username.
+
+        Returns
+        ----------
+        None
+        '''
         #format the message into a server request, then serialize
         formatted_req = "{'command':'message_sent','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
         serialized_req = json.dumps(formatted_req).encode()
         return serialized_req
 
 
-    #Sender-side chat initialization for the SendThread
     def request_new_chat(self, recv_username):
-        #retrieve requested user's public key bundle from the server DB
-        #(sending placeholder message)
-        #establish X3DH authentication
-    
-        #on every new message, recalculate the shared key prior to sending
+        '''
+        Initial request from clientA for a chat to be established
+        with clientB. This request is sent to the server, and forwarded
+        to the receiver client.
 
-        #locked_print req'd here
+        Parameters
+        ----------
+        recv_username: str
+            The intended receiver-side client's username.
+
+        Returns
+        ----------
+        None
+        '''
         os.system('clear')
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
@@ -139,11 +276,28 @@ class ClientSendThread(Thread):
 
         #sender-side user chat scenario
         self.join_chat(recv_username)
-
         return
 
 
     def parse_main_menu_input(self, input_str):
+        '''
+        Parse all user input in the main-menu scope. User input is split into
+        two parts, separated by the colon (:) that the user passes. Returns
+        both the command and target username.
+
+        Parameters
+        ----------
+        input_str: str
+            The input string received from the user.
+
+        Returns
+        ----------
+        args[0]: str
+            The first part of the user's input, representing the command.
+
+        args[1]: str
+            The second part of the user's input, representing the target username.
+        '''
         #place arguments into a list
         args = input_str.lower().split(":")
 
@@ -157,9 +311,24 @@ class ClientSendThread(Thread):
         return args[0], args[1]
 
     
-    #generic client handling of a chat
     def join_chat(self, other_username):
-        #self.clear_screen()
+        '''
+        SendThread initialization of entering a real-time chat with another user.
+        The user can now input any text, and that text becomes sent as a message
+        to the connected client. Quitting the chat involves the '--quit' command.
+
+        **Note**: There is NO notification of clients at the other end of the chat
+        that leave the real-time chat.
+
+        Parameters
+        ----------
+        other_username: str
+            The other client's username also connected to the chat.
+
+        Returns
+        ----------
+        None
+        '''
         #SendThread chat message loop
         while True:
             try:
@@ -197,6 +366,24 @@ class ClientSendThread(Thread):
 
 
     def request_history(self, other_username):
+        '''
+        SendThread initialization of entering a real-time chat with another user.
+        The user can now input any text, and that text becomes sent as a message
+        to the connected client. Quitting the chat involves the '--quit' command.
+        The SendThread blocks in this function until the server provides a response.
+
+        **Note**: There is NO notification of clients at the other end of the chat
+        that leave the real-time chat.
+
+        Parameters
+        ----------
+        other_username: str
+            The other client's username also connected to the chat.
+
+        Returns
+        ----------
+        None
+        '''
         #ask the server to retrieve conversation history
         try:
             req_conversation = "{'command':'history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
@@ -212,6 +399,22 @@ class ClientSendThread(Thread):
 
 
     def request_delete_history(self, other_username):
+        '''
+        Request to delete a user's conversation history with a specified client.
+        The server receives this request and correctly deletes from the DB.
+        Message histories that are deleted are permanently lost.
+
+        The SendThread blocks in this function until the server provides a response.
+
+        Parameters
+        ----------
+        other_username: str
+            The associated client whose conversation history should be deleted.
+
+        Returns
+        ----------
+        None
+        '''
         #ask the server to delete conversation history with a specific user
         try:
             req_deletion = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Delete a conversation history'}"%(self.username, other_username)
@@ -227,6 +430,22 @@ class ClientSendThread(Thread):
 
 
     def request_delete_all_histories(self, my_username):
+        '''
+        Request to delete every conversation for a specific user.
+        The server receives this request and correctly deletes from the DB.
+        Message histories that are deleted are permanently lost.
+
+        The SendThread blocks in this function until the server provides a response.
+
+        Parameters
+        ----------
+        my_username: str
+            The associated client whose set of conversation histories should be deleted.
+
+        Returns
+        ----------
+        None
+        '''
         #ask the server to delete all conversations owned by this client
         try:
             req_delete_all = "{'command':'delete-all-histories', 'my_username':'%s', 'message':'Delete all conversation histories'}"%(self.username)
@@ -242,6 +461,22 @@ class ClientSendThread(Thread):
 
 
     def request_delete_account(self, my_username):
+        '''
+        Request to delete a specific client account.
+        The server receives this request and correctly deletes from the DB.
+        Accounts that are deleted are permanently lost.
+
+        The SendThread blocks in this function until the server provides a response.
+
+        Parameters
+        ----------
+        my_username: str
+            The associated client whose account should be deleted.
+
+        Returns
+        ----------
+        None
+        '''
         #ask the server to delete my account & accompanying message histories
         try:
             req_delete_account = "{'command':'delete-account', 'my_username':'%s', 'message':'Delete my account.'}"%(self.username)
@@ -257,6 +492,24 @@ class ClientSendThread(Thread):
 
 
     def main_menu(self):
+        '''
+        The main program loop of the ClientSendThread. Continually accepts user input,
+        and handles commands appropriately. Requests are serialized and sent to the server.
+
+        Should this function return, this SendThread is terminated.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        0: int
+            If zero is returned, the program should exit gracefully.
+        
+        1: int
+            If one is returned, the thread should exit and return to the login scope.
+        '''
         #continuously accept user input from the main menu
         while True:
 
@@ -340,6 +593,18 @@ class ClientSendThread(Thread):
 
     #Override: continuous execution of the sender thread
     def run(self):
+        '''
+        threading.Thread function override to instantiate objects and determine the flow of the
+        thread's execution. When this function returns, the thread terminates.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''  
         #add this client's username/socket pair to the shared dictionary
         config.connections.update({self.username: self.sock})
 

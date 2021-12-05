@@ -488,7 +488,19 @@ class ServerThread(Thread):
 
 
     #continuous execution of the thread - function override
-    def run(self):        
+    def run(self):
+        '''
+        threading.Thread function override to instantiate objects and determine the flow of the
+        thread's execution. When this function returns, the thread terminates.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
+        '''       
         #create a database connection object for this server thread
         self.db_conn = DatabaseConn()
 
