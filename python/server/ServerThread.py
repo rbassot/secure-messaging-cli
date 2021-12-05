@@ -204,7 +204,7 @@ class ServerThread(Thread):
             'command':'exit-chat', 
             'send_username':send_client, 
             'recv_username':recv_client, 
-            'message':send_client + 'has closed the chat - Hit ENTER to return to the main menu.'
+            'message':send_client + ' has closed the chat - Hit ENTER to return to the main menu.'
         }
         serialized_recv_resp = json.dumps(receiver_resp).encode()
 

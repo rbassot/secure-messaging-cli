@@ -267,7 +267,7 @@ class ClientSendThread(Thread):
         ----------
         None
         '''
-        os.system('clear')
+        self.clear_screen()
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
             #create sender-side client request
@@ -291,6 +291,9 @@ class ClientSendThread(Thread):
         #self.event.clear()
         
         #TODO: add the failure path - display error message & return to main menu
+
+        #reset the shared connected_username variable
+        config.connected_username = recv_username
 
         #sender-side user chat scenario
         self.join_chat(recv_username)
@@ -328,6 +331,22 @@ class ClientSendThread(Thread):
 
         return args[0], args[1]
 
+    def notify_exiting_chat(self, other_username):
+        #notify the server that the chat is being exited
+        # exit_notif = "{'command':'exit-chat','send_username':'%s','recv_username':'%s','message':'Exiting the user chat.'}"%(self.username, other_username)
+        exit_notif = {
+            'command':'exit-chat',
+            'send_username':self.username,
+            'recv_username':other_username,
+            'message':'Exiting the user chat.'
+        }
+        serialized_req = json.dumps(exit_notif).encode()
+        self.sock.send(serialized_req)
+
+        #wait for the response to be received in the RecvThread
+        config.shared_event.wait()
+        return
+
     
     def join_chat(self, other_username):
         '''
@@ -348,7 +367,7 @@ class ClientSendThread(Thread):
         None
         '''
         #SendThread chat message loop
-        while True:
+        while config.connected_username:
             try:
                 #get user input for writing a message to the connected user
                 #TODO: may need to avoid input() + use an event here??
@@ -360,6 +379,7 @@ class ClientSendThread(Thread):
                 #check for user exit request
                 if(user_message in ('--quit', '--quit-chat')):
                     #should notify the server on exit - to be able to notify the other client that user has dropped
+                    self.notify_exiting_chat(other_username)
                     #also must notify the RecvThread that exit was asked for - use a global flag/event?
                     self.locked_print("Exiting the chat session...")
                     break
