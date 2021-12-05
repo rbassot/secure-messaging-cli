@@ -19,6 +19,9 @@ import binascii
 from PIL import Image
 import io
 import base64
+
+#colored output
+from termcolor import colored, cprint
 '''
 Basic ClientRecvThread class for the client-side to continually listen to the server.
 '''
@@ -128,7 +131,9 @@ class ClientRecvThread(Thread):
         None
         '''
         #initial chat welcoming
-        self.locked_print('\033[1m' + "Now chatting with " + str(other_username) + "." + '\033[0m')
+        welcome_msg = "Now chatting with " + str(other_username) + "."
+        color_msg = colored(welcome_msg, 'yellow')
+        self.locked_print(color_msg)
         self.locked_print("")
 
         #allow the SendThread to enter the chat

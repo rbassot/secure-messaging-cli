@@ -449,7 +449,8 @@ class ClientSendThread(Thread):
                 self.locked_print("\033[A\033[A")
                 self.locked_print("You: " + user_message)
 
-            except:
+            except Exception as e:
+                print(e)
                 self.locked_print("There was an issue somewhere in the chat...")
         return
 

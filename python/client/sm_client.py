@@ -241,8 +241,11 @@ def start_client():
                 #return to login menu scope
                 print("Logging out of " + client_username)
 
-
-                
+                # clear config files for next user
+                config.shared_event.clear()
+                config.connections = {}
+                config.connected_username = None
+                config.username = None
                 break
 
             #exit program - daemon threads are cleaned up automatically
