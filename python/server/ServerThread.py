@@ -48,9 +48,9 @@ class ServerThread(Thread):
 
     def handle_new_chat(self, send_username, recv_username):
         '''
-        Server-side handling of a chat request from clientA. Sends a 'request to chat from
-        clientA' to clientB. This ServerThread - associated with clientA - will block until
-        confirmation is received at the clientB ServerThread, which triggers an event to
+        Server-side handling of a chat request from ClientA. Sends a 'request to chat from
+        ClientA' to ClientB. This ServerThread - associated with ClientA - will block until
+        confirmation is received at the ClientB ServerThread, which triggers an event to
         release the blocked thread.
 
         Parameters
@@ -101,9 +101,9 @@ class ServerThread(Thread):
 
     def accept_chat_request(self):
         '''
-        Server-side handling of a chat response received from clientB. This function only
+        Server-side handling of a chat response received from ClientB. This function only
         releases the blocked ServerThreadA, clears the event, and then returns to then
-        wait for any messages coming from clientB (directed towards client A).
+        wait for any messages coming from ClientB (directed towards client A).
 
         Parameters
         ----------
@@ -379,7 +379,7 @@ class ServerThread(Thread):
         '''
         #retrieve all messages from the DB for this users conversation history with specific client
         messages = self.db_conn.get_message_history(this_username, other_username)
-        # print(messages, type(messages))
+        #print(messages, type(messages))
         if(not messages):
             print("There were no messages in the client's history!")
 
@@ -403,11 +403,11 @@ class ServerThread(Thread):
         # print("sending serialized resp...")
         # print("LENGTH", len(serialized_resp))
         # losing first 1024 bytes, prepend to make up for loss
-        random_bytes = b'b'*1024
+        #random_bytes = b'b'*1024
         try:
             #to change!!!
-            sent_size = self.sock.send(random_bytes + history_resp)
-            # print("sent size:", sent_size)
+            sent_size = self.sock.send(history_resp)
+            #print("sent size:", sent_size)
         except Exception as e:
             print(e)
         
@@ -443,7 +443,7 @@ class ServerThread(Thread):
         del_history_resp = {
             'command':'delete-history',
             'response':'SUCCESS',
-            'message':'Successfully deleted your conversation history with.' + other_username
+            'message':'Successfully deleted your conversation history with ' + other_username + '.'
         }
         serialized_resp = json.dumps(del_history_resp).encode()
         self.sock.send(serialized_resp)
@@ -555,7 +555,7 @@ class ServerThread(Thread):
             elif(client_req['command'] == 'accept-chat-req'):
                 self.accept_chat_request()
 
-            #basic redirection of a chat message from clientA to clientB
+            #basic redirection of a chat message from ClientA to ClientB
             elif(client_req['command'] == 'message-sent'):
                 self.handle_send_message(client_req['send_username'], client_req['recv_username'], client_req['message'], None) #How do we handle image?
 

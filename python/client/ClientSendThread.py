@@ -254,8 +254,8 @@ class ClientSendThread(Thread):
 
     def request_new_chat(self, recv_username):
         '''
-        Initial request from clientA for a chat to be established
-        with clientB. This request is sent to the server, and forwarded
+        Initial request from ClientA for a chat to be established
+        with ClientB. This request is sent to the server, and forwarded
         to the receiver client.
 
         Parameters
@@ -332,6 +332,20 @@ class ClientSendThread(Thread):
         return args[0], args[1]
 
     def notify_exiting_chat(self, other_username):
+        '''
+        Notifies the server that this client is terminating the real-time chat.
+        SendThread blocks until a response is received from the server in the
+        RecvThread. Returns to the main menu scope on completion.
+
+        Parameters
+        ----------
+        other_username: str
+            The other client's username also connected to the chat.
+
+        Returns
+        ----------
+        None
+        '''
         #notify the server that the chat is being exited
         # exit_notif = "{'command':'exit-chat','send_username':'%s','recv_username':'%s','message':'Exiting the user chat.'}"%(self.username, other_username)
         exit_notif = {
@@ -350,12 +364,10 @@ class ClientSendThread(Thread):
     
     def join_chat(self, other_username):
         '''
-        SendThread initialization of entering a real-time chat with another user.
+        SendThread initialization for entering a real-time chat with another user.
         The user can now input any text, and that text becomes sent as a message
-        to the connected client. Quitting the chat involves the '--quit' command.
-
-        **Note**: There is NO notification of clients at the other end of the chat
-        that leave the real-time chat.
+        to the connected client. Quitting the chat involves the '--quit' command,
+        which notifies both clients that the chat has closed.
 
         Parameters
         ----------
@@ -370,7 +382,6 @@ class ClientSendThread(Thread):
         while config.connected_username:
             try:
                 #get user input for writing a message to the connected user
-                #TODO: may need to avoid input() + use an event here??
                 user_message = self.locked_input("")
 
                 if not user_message:

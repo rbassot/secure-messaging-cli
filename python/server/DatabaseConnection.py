@@ -101,9 +101,9 @@ class DatabaseConn():
         #get row count for ID field
         try:
             cursor = self.db_connection.cursor()
-            row_count = self.get_Message_row_count()
-            data = [row_count + 1, owner_username, send_username, recv_username, encr_message]
-            query = "INSERT INTO Message(id, owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?, ?)"
+            #row_count = self.get_Message_row_count()
+            data = [owner_username, send_username, recv_username, encr_message]
+            query = "INSERT INTO Message(owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?)"
             cursor.execute(query, data)
             self.db_connection.commit()
             return 1
@@ -155,10 +155,11 @@ class DatabaseConn():
             print("DELETE OneTimePrekey ERROR: " + str(e))
             return 0
 
+
     def get_message_history(self, send_username, recv_username):
         cursor = self.db_connection.cursor()
-        data = [send_username]
-        query = "SELECT * FROM 'Message' WHERE owned_username LIKE ?"
+        data = [send_username, recv_username, recv_username]
+        query = "SELECT * FROM 'Message' WHERE owned_username LIKE ? AND (send_username LIKE ? OR recv_username LIKE ?)"
         cursor.execute(query, data)
         messages = cursor.fetchall()
         return messages
@@ -280,12 +281,13 @@ class DatabaseConn():
         #safely check if table is already created before creating it
         cursor = self.db_connection.cursor()
         query = '''CREATE TABLE IF NOT EXISTS Message(
-                    id INTEGER NOT NULL PRIMARY KEY,
-                    owned_username TEXT NOT NULL,
-                    send_username TEXT NOT NULL,
-                    recv_username TEXT NOT NULL,
-                    encr_message TEXT)
-                    '''
+                        owned_username TEXT NOT NULL,
+                        send_username TEXT NOT NULL,
+                        recv_username TEXT NOT NULL,
+                        encr_message TEXT,
+                        PRIMARY KEY(owned_username, encr_message)
+                    )
+                '''
         #Do we need to store any keys here??
         cursor.execute(query)
         self.db_connection.commit()
