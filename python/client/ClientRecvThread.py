@@ -170,6 +170,7 @@ class ClientRecvThread(Thread):
                     # decrypt the AESGCM-encrypted message
                     decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
 
+                    #handle image messages
                     if(message_json['image_attached'] == "true"):
                         encoded_img_string = decrypted_msg.encode('utf-8')
                         # convert img str to base64 bytes
@@ -182,6 +183,7 @@ class ClientRecvThread(Thread):
                         pilimage = pilimage.save(save_name)
                         self.locked_print('\033[94m' + "Image saved as: " + save_name + '\033[0m')
 
+                    #hanlde regular messages
                     else:
                         message_str = str(other_username) + ": " + str(decrypted_msg)
                         self.locked_print('\033[94m' + message_str + '\033[0m')

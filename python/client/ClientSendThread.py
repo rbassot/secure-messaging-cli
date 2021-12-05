@@ -398,10 +398,12 @@ class ClientSendThread(Thread):
                     #also must notify the RecvThread that exit was asked for - use a global flag/event?
                     self.locked_print("Exiting the chat session...")
                     break
+
+                #handle image sending
                 if(user_message == '--send-image'):
                     # assuming picture is in the same directory
                     # open img and covert to bytes
-                    print("Type the picture name and its extension, e.g. picture_name.png")
+                    print("Type the absolute path to the picture along with its name and extension, e.g. picture_name.png")
                     path = self.locked_input("")
 
                     # open image and get base64 bytes
@@ -423,8 +425,16 @@ class ClientSendThread(Thread):
                     serialized_req = self.serialize_chat_message(enc_img_str, other_username, "true")
                     self.sock.send(serialized_req)
 
+                    #rewrite the output message that appears at the console
+                    path_token = path.split('\\')[-1].strip('\"')
+                    user_message = "Image sent as: " + path_token
+
+                    #return the cursor to the start of the previous console output line (for overwrite)
+                    print("", end="\r")
+                    self.locked_print("\033[K")
+
+                #handle regular message sending
                 else:
-                    # regular message
                     #encrypt the message, format & serialize, then send to server
                     encrypted_msg = self.enc_user.encrypt_msg(other_username, user_message)
                     
@@ -434,7 +444,6 @@ class ClientSendThread(Thread):
 
                     serialized_req = self.serialize_chat_message(str_enc_msg, other_username, "false")
                     self.sock.send(serialized_req)
-
 
                 #finally, print the client's own message to its own chat window
                 self.locked_print("\033[A\033[A")

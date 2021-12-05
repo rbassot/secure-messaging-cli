@@ -221,9 +221,9 @@ def start_client():
         #user has logged in: create 2 threads - one for sending, one for receiving
         global threads
         send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
-        threads.append(send_thread)
+        #threads.append(send_thread)
         recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
-        threads.append(recv_thread)
+        #threads.append(recv_thread)
 
         #set threads to daemons for auto cleanup on program exit
         send_thread.daemon = True
@@ -240,6 +240,9 @@ def start_client():
 
                 #return to login menu scope
                 print("Logging out of " + client_username)
+
+
+                
                 break
 
             #exit program - daemon threads are cleaned up automatically
