@@ -20,6 +20,9 @@ import base64
 
 #colored output
 from termcolor import colored, cprint
+
+# delete img hist
+import shutil
 '''
 Basic ClientRecvThread class for the client-side to continually listen to the server.
 '''
@@ -476,10 +479,6 @@ class ClientRecvThread(Thread):
                 #handle deleting conversation history with a specific client from the server
                 elif(server_resp['command'] == 'delete-history'):
                     self.locked_print(server_resp['message'])
-                    
-                    # delete pic_dir
-                    
-
 
                     config.shared_event.set()
                     config.shared_event.clear()
@@ -487,13 +486,44 @@ class ClientRecvThread(Thread):
                 #handle deleting ALL conversation histories - required at the end of every session
                 elif(server_resp['command'] == 'delete-all-histories'):
                     self.locked_print(server_resp['message'])
+                    
+                    cur_dir = os.getcwd()
+
+                    # get pic directory - assuming cur_dir is the root of project folder
+                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username
+                    
+                    if os.path.isdir(pic_hist_dir) is True:
+                        try:
+                            # delete specified dir + files within dir
+                            shutil.rmtree(pic_hist_dir)
+                        except Exception as e:
+                            print(e)
+                            print("ERROR - Could not delete image history")
+                            return
+
                     config.shared_event.set()
                     config.shared_event.clear()
+                    
                     return
 
                 #handle your account deletion - terminates the session
                 elif(server_resp['command'] == 'delete-account'):
                     self.locked_print(server_resp['message'])
+
+                    cur_dir = os.getcwd()
+
+                    # get pic directory - assuming cur_dir is the root of project folder
+                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username
+
+                    if os.path.isdir(pic_hist_dir) is True:
+                        try:
+                            # delete specified dir + files within dir
+                            shutil.rmtree(pic_hist_dir)
+                        except Exception as e:
+                            print(e)
+                            print("ERROR - Could not delete image history")
+                            return
+
                     config.shared_event.set()
                     config.shared_event.clear()
                     return

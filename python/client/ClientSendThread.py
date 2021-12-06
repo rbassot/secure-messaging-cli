@@ -16,6 +16,9 @@ import binascii
 from PIL import Image
 import base64
 
+# delete dir + files within dir
+import shutil
+
 '''
 Basic ClientSendThread class for the client-side to handle user interface/interaction & send requests to the server.
 '''
@@ -567,7 +570,7 @@ class ClientSendThread(Thread):
         #ask the server to delete my account & accompanying message histories
         try:
             req_delete_account = (json.dumps({
-                'command':'message-sent',
+                'command':'delete-account',
                 'send_username':self.username,
                 'message':'Delete my account'
             })).encode()
@@ -643,9 +646,40 @@ class ClientSendThread(Thread):
                 elif(option == "--delete-history"):
                     self.request_delete_history(recv_user)
 
+                    # get current dir path
+                    cur_dir = os.getcwd()
+
+                    # get pic directory - assuming cur_dir is the root of project folder
+                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username + "\\" + recv_user
+                    
+                    if os.path.isdir(pic_hist_dir) is True:    
+                        try:
+                            # delete specified dir + files within dir
+                            shutil.rmtree(pic_hist_dir)
+                        except Exception as e:
+                            print(e)
+                            print("ERROR - Could not delete image history - History deletion")
+                            return
+
+
                 #handle account deletion (with all accompanying owned conversation histories)
                 elif(option == "--delete-account"):
                     self.request_delete_account(self.username)
+                    # get current dir path
+                    cur_dir = os.getcwd()
+
+                    # get pic directory - assuming cur_dir is the root of project folder
+                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username
+                    
+                    if os.path.isdir(pic_hist_dir) is True:    
+                        try:
+                            # delete specified dir + files within dir
+                            shutil.rmtree(pic_hist_dir)
+                        except Exception as e:
+                            print(e)
+                            print("ERROR - Could not delete image history - Account deletion")
+                            return
+
                     return 1
 
                 #Receiver-side chat initialization for the SendThread
