@@ -218,7 +218,7 @@ class ClientSendThread(Thread):
         return
 
     
-    def serialize_chat_message(self, message, recv_username, is_picture):
+    def serialize_chat_message(self, message, recv_username, image_path):
         '''
         Serializes chat messages to be sent to the server, then redirected
         to the receiver-side client. Serializing involves formatting the
@@ -247,7 +247,7 @@ class ClientSendThread(Thread):
             'send_username':self.username,
             'recv_username':recv_username,
             'message':message,
-            'is_picture':is_picture
+            'image_path': image_path
         })).encode()
 
         return formatted_req
@@ -418,13 +418,13 @@ class ClientSendThread(Thread):
                     enc_img_to_hex = binascii.hexlify(encrypted_img)
                     enc_img_str = enc_img_to_hex.decode()
 
-                    # send img
-                    serialized_req = self.serialize_chat_message(enc_img_str, other_username, "true")
-                    self.sock.send(serialized_req)
-
                     #rewrite the output message that appears at the console
                     path_token = path.split('\\')[-1].strip('\"')
                     user_message = "Image sent as: " + path_token
+
+                    # send img
+                    serialized_req = self.serialize_chat_message(enc_img_str, other_username, path)
+                    self.sock.send(serialized_req)
 
                     #return the cursor to the start of the previous console output line (for overwrite)
                     print("", end="\r")

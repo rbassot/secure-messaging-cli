@@ -96,11 +96,11 @@ class DatabaseConn():
             return 0
 
 
-    def insert_new_message(self, owner_username, send_username, recv_username, encr_message):
+    def insert_new_message(self, owner_username, send_username, recv_username, encr_message, image_path):
         try:
             cursor = self.db_connection.cursor()
-            data = [owner_username, send_username, recv_username, encr_message]
-            query = "INSERT INTO Message(owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?)"
+            data = [owner_username, send_username, recv_username, encr_message, image_path]
+            query = "INSERT INTO Message(owned_username, send_username, recv_username, encr_message, image_path) VALUES(?, ?, ?, ?, ?)"
             cursor.execute(query, data)
             self.db_connection.commit()
             return 1
@@ -281,7 +281,8 @@ class DatabaseConn():
                         owned_username TEXT NOT NULL,
                         send_username TEXT NOT NULL,
                         recv_username TEXT NOT NULL,
-                        encr_message TEXT,
+                        encr_message TEXT NOT NULL,
+                        image_path TEXT,
                         PRIMARY KEY(owned_username, encr_message)
                     )
                 '''

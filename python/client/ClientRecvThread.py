@@ -171,7 +171,7 @@ class ClientRecvThread(Thread):
                     decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
 
                     #handle image messages
-                    if(message_json['image_attached'] == "true"):
+                    if(message_json['image_name'] != "false"):
                         encoded_img_string = decrypted_msg.encode('utf-8')
                         # convert img str to base64 bytes
                         img_bytes = binascii.unhexlify(encoded_img_string)
@@ -179,9 +179,40 @@ class ClientRecvThread(Thread):
 
                         # convert b64 to .png
                         pilimage = Image.open(io.BytesIO(f))
-                        save_name = "pic_recv.png"
-                        pilimage = pilimage.save(save_name)
-                        self.locked_print('\033[94m' + "Image saved as: " + save_name + '\033[0m')
+                        img_path = message_json['image_name']
+                        img_name = img_path.split('\\')[-1].strip('\"')
+                        img_dir = img_path.strip(img_name + '\\\"')
+                        
+                        # save image
+                        try:
+                            # get current dir path
+                            cur_dir = os.getcwd()   
+                            
+                            # get pic directory - assuming cur_dir is the root of project folder
+                            pic_dir = cur_dir + "\\python\\client\\pictures\\" + self.username + "\\" + other_username
+                            
+                            # check if dir already exists
+                            if os.path.isdir(pic_dir) is True: 
+                                continue
+                            else:
+                                try:
+                                    # recursive function to create dirs needed for leaf dir
+                                    os.makedirs(pic_dir)
+                                except Exception as e:
+                                    print(e)
+                                    print("ERROR - Could not create directories!")
+                            
+                            img_dir = pic_dir + "\\"
+
+                            pilimage = pilimage.save(img_dir + img_name)
+                            
+                            self.locked_print('\033[94m' + "Image Received: " + img_name + "  Saved: " + img_dir + img_name + '\033[0m')
+
+                        except Exception as e:
+                            print(e)
+                            print("ERROR - Could not save image!")
+                            return
+
 
                     #handle regular messages
                     else:
@@ -307,6 +338,10 @@ class ClientRecvThread(Thread):
         self.locked_print("")
         self.locked_print("--- Conversation history with " + str(other_username) + ": ---")
 
+        # flag to open pic_dir
+        flag = False
+        
+
         for row in message_list:
             try:
                 #decrypt the sent messages from the server, then format and print to screen
@@ -318,18 +353,59 @@ class ClientRecvThread(Thread):
                 if(str(row[1]) == self.username):
                     decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, True)
                     message = decrypted_msg
-                    self.locked_print("You: " + message)
+
+                    if row[4] == "false":    # no image attached
+                        self.locked_print("You: " + message)
+                    else:
+                        # get img path, name, and directory
+                        img_path = row[4]
+                        img_name = img_path.split('\\')[-1].strip('\"')
+                        img_dir = img_path.strip(img_name + '\\\"')
+
+                        # print image name and from where
+                        msg = "Image Sent: " + img_name + " from: " + img_dir
+                        self.locked_print("You: " + msg)
+
 
                 #own messages from the other client (incoming)
                 elif(str(row[1]) == other_username):
                     decrypted_msg = self.enc_user.decrypt_msg(other_username, enc_msg_bytes, False)
                     message = decrypted_msg
-                    message_str = other_username + ": " + message
-                    self.locked_print('\033[94m' + message_str + '\033[0m')
+                    message_str = other_username + ": "
+
+                    if row[4] == "false":    # no image attached
+                        self.locked_print('\033[94m' + message_str + message + '\033[0m')
+                    else:
+                        img_path = row[4]
+                        img_name = img_path.split('\\')[-1].strip('\"')
+                        img_dir = img_path.strip(img_name + '\\\"')
+
+                        self.locked_print('\033[94m' + message_str + "Image Received: " + img_name + '\033[0m')
+                        flag = True
 
             except Exception as e:
                 self.locked_print(e)
                 return
+        
+        # open image directory
+        if flag is True:
+            # get current dir path
+            cur_dir = os.getcwd()   
+            
+            # get pic directory - assuming cur_dir is the root of project folder
+            pic_dir = cur_dir + "\\python\\client\\pictures\\" + self.username + "\\" + other_username
+
+            # pop directory window
+            try:
+                os.startfile(pic_dir)
+            except Exception as e:
+                print(e)
+                print("ERROR - Directory doesn't exist!")
+                return
+
+            # reset pic_dir and flag - not sure if needed, just for safety
+            pic_dir = ""
+            flag = False
 
         self.locked_print("")
         return
@@ -400,6 +476,11 @@ class ClientRecvThread(Thread):
                 #handle deleting conversation history with a specific client from the server
                 elif(server_resp['command'] == 'delete-history'):
                     self.locked_print(server_resp['message'])
+                    
+                    # delete pic_dir
+                    
+
+
                     config.shared_event.set()
                     config.shared_event.clear()
 
