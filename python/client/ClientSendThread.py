@@ -583,6 +583,27 @@ class ClientSendThread(Thread):
             self.locked_print("There was an issue with deleting the client's account...")
         return
 
+    def delete_image_history(self, my_username, other_username, is_account):
+        cur_dir = os.getcwd()
+
+        pic_hist_dir = ""
+
+        # get pic directory - assuming cur_dir is the root of project folder
+        if is_account is True:
+            pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + my_username
+        else:
+            pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + my_username + "\\" + other_username
+        
+        if os.path.isdir(pic_hist_dir) is True:    
+            try:
+                # delete specified dir + files within dir
+                shutil.rmtree(pic_hist_dir)
+            except Exception as e:
+                print(e)
+                print("ERROR - Could not delete image history - History deletion")
+                return
+
+
 
     def main_menu(self):
         '''
@@ -629,6 +650,7 @@ class ClientSendThread(Thread):
                 elif(option == "--exit"):
                     #notify the server to delete message history for the client (session terminates)
                     self.request_delete_all_histories(self.username)
+                    self.delete_image_history(self.username, recv_user, False)
                     self.close_server_conn()
                     return 0
 
@@ -636,6 +658,7 @@ class ClientSendThread(Thread):
                 elif(option == "--logout"):
                     #notify the server to delete message history for the client (session terminates)
                     self.request_delete_all_histories(self.username)
+                    self.delete_image_history(self.username, recv_user, False)
                     return 1
 
                 #handle user retrieving conversation history
@@ -645,41 +668,12 @@ class ClientSendThread(Thread):
                 #handle user retrieving conversation history
                 elif(option == "--delete-history"):
                     self.request_delete_history(recv_user)
-
-                    # get current dir path
-                    cur_dir = os.getcwd()
-
-                    # get pic directory - assuming cur_dir is the root of project folder
-                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username + "\\" + recv_user
-                    
-                    if os.path.isdir(pic_hist_dir) is True:    
-                        try:
-                            # delete specified dir + files within dir
-                            shutil.rmtree(pic_hist_dir)
-                        except Exception as e:
-                            print(e)
-                            print("ERROR - Could not delete image history - History deletion")
-                            return
-
+                    self.delete_image_history(self.username, recv_user, False)
 
                 #handle account deletion (with all accompanying owned conversation histories)
                 elif(option == "--delete-account"):
                     self.request_delete_account(self.username)
-                    # get current dir path
-                    cur_dir = os.getcwd()
-
-                    # get pic directory - assuming cur_dir is the root of project folder
-                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username
-                    
-                    if os.path.isdir(pic_hist_dir) is True:    
-                        try:
-                            # delete specified dir + files within dir
-                            shutil.rmtree(pic_hist_dir)
-                        except Exception as e:
-                            print(e)
-                            print("ERROR - Could not delete image history - Account deletion")
-                            return
-
+                    self.delete_image_history(self.username, recv_user, True)
                     return 1
 
                 #Receiver-side chat initialization for the SendThread

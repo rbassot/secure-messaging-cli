@@ -487,20 +487,6 @@ class ClientRecvThread(Thread):
                 elif(server_resp['command'] == 'delete-all-histories'):
                     self.locked_print(server_resp['message'])
                     
-                    cur_dir = os.getcwd()
-
-                    # get pic directory - assuming cur_dir is the root of project folder
-                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username
-                    
-                    if os.path.isdir(pic_hist_dir) is True:
-                        try:
-                            # delete specified dir + files within dir
-                            shutil.rmtree(pic_hist_dir)
-                        except Exception as e:
-                            print(e)
-                            print("ERROR - Could not delete image history")
-                            return
-
                     config.shared_event.set()
                     config.shared_event.clear()
                     
@@ -509,20 +495,6 @@ class ClientRecvThread(Thread):
                 #handle your account deletion - terminates the session
                 elif(server_resp['command'] == 'delete-account'):
                     self.locked_print(server_resp['message'])
-
-                    cur_dir = os.getcwd()
-
-                    # get pic directory - assuming cur_dir is the root of project folder
-                    pic_hist_dir = cur_dir + "\\python\\client\\pictures\\" + self.username
-
-                    if os.path.isdir(pic_hist_dir) is True:
-                        try:
-                            # delete specified dir + files within dir
-                            shutil.rmtree(pic_hist_dir)
-                        except Exception as e:
-                            print(e)
-                            print("ERROR - Could not delete image history")
-                            return
 
                     config.shared_event.set()
                     config.shared_event.clear()
