@@ -21,7 +21,7 @@ Basic ClientSendThread class for the client-side to handle user interface/intera
 '''
 
 class ClientSendThread(Thread):
-    def __init__(self, socket, address, username):    #Inherit from Thread class
+    def __init__(self, socket, address, username):
         '''
         Initializes a ClientSendThread instance as a subclass of threading.Thread.
         This thread handles client input, and outgoing requests to the server.
@@ -50,11 +50,10 @@ class ClientSendThread(Thread):
         ----------
         None
         '''
-        Thread.__init__(self) #provide a common event for interthread communication between send/receive threads
+        Thread.__init__(self)
         self.sock = socket
         self.addr = address
         self.username = username
-        #self.queue = queue
         self.exception = None
         self.enc_user = None
 
@@ -65,7 +64,6 @@ class ClientSendThread(Thread):
             self.enc_user = config.username
 
 
-    #Override: to be able to pass the exception to the called thread (main)
     def join(self):
         '''
         Function override to be able to pass an exception to the caller thread
@@ -195,7 +193,6 @@ class ClientSendThread(Thread):
         self.locked_print("--exit                           Gracefully logout and exit Python CLI Secure Messaging.")
         self.locked_print("--options                        Display available options from this menu.")
         self.locked_print("")
-        #**should add functionality for a user to view an image that was attached in a previous message**
 
 
     def close_server_conn(self):
@@ -240,8 +237,6 @@ class ClientSendThread(Thread):
         None
         '''
         #format the message into a server request, then serialize
-        # formatted_req = "{'command':'message_sent','send_username':'%s','recv_username':'%s','message':'%s'}"%(self.username, recv_username, message)
-        # serialized_req = json.dumps(formatted_req).encode()
         formatted_req = (json.dumps({
             'command':'message-sent',
             'send_username':self.username,
@@ -272,8 +267,6 @@ class ClientSendThread(Thread):
         self.locked_print("Connecting with " + str(recv_username) + "...")
         try:
             #create sender-side client request
-            # connect_req = "{'command':'chat','send_username':'%s','recv_username':'%s','message':'Connect with user'}"%(self.username, recv_username)
-            # serialized_req = json.dumps(connect_req).encode()
             connect_req = (json.dumps({
                 'command':'chat',
                 'send_username':self.username,
@@ -288,10 +281,8 @@ class ClientSendThread(Thread):
         #server handles sending a chat request to the receiver
         #blocked until the other user accepts the chat request, and this client's own RecvThread triggers event
         config.shared_event.wait()
-
-        #self.event.clear()
         
-        #TODO: add the failure path - display error message & return to main menu
+        #TODO: add the failure path in next version - display error message & return to main menu
 
         #reset the shared connected_username variable
         config.connected_username = recv_username
@@ -348,7 +339,6 @@ class ClientSendThread(Thread):
         None
         '''
         #notify the server that the chat is being exited
-        # exit_notif = "{'command':'exit-chat','send_username':'%s','recv_username':'%s','message':'Exiting the user chat.'}"%(self.username, other_username)
         exit_notif = {
             'command':'exit-chat',
             'send_username':self.username,
@@ -392,7 +382,6 @@ class ClientSendThread(Thread):
                 if(user_message in ('--quit', '--quit-chat')):
                     #should notify the server on exit - to be able to notify the other client that user has dropped
                     self.notify_exiting_chat(other_username)
-                    #also must notify the RecvThread that exit was asked for - use a global flag/event?
                     self.locked_print("Exiting the chat session...")
                     break
 
@@ -473,9 +462,6 @@ class ClientSendThread(Thread):
         '''
         #ask the server to retrieve conversation history
         try:
-            # req_conversation = "{'command':'history', 'my_username':'%s', 'other_username':'%s', 'message':'Retrieve conversation history'}"%(self.username, other_username)
-            # serialized_req = json.dumps(req_conversation).encode()
-
             req_conversation = (json.dumps({
                 'command':'history',
                 'send_username':self.username,
@@ -511,8 +497,6 @@ class ClientSendThread(Thread):
         '''
         #ask the server to delete conversation history with a specific user
         try:
-            # req_deletion = "{'command':'delete-history', 'my_username':'%s', 'other_username':'%s', 'message':'Delete a conversation history'}"%(self.username, other_username)
-            # serialized_req = json.dumps(req_deletion).encode()
             req_deletion = (json.dumps({
                 'command':'delete-history',
                 'send_username':self.username,
@@ -548,8 +532,6 @@ class ClientSendThread(Thread):
         '''
         #ask the server to delete all conversations owned by this client
         try:
-            # req_delete_all = "{'command':'delete-all-histories', 'my_username':'%s', 'message':'Delete all conversation histories'}"%(self.username)
-            # serialized_req = json.dumps(req_delete_all).encode()
             req_delete_all = (json.dumps({
                 'command':'delete-all-histories',
                 'send_username':self.username,
@@ -584,8 +566,6 @@ class ClientSendThread(Thread):
         '''
         #ask the server to delete my account & accompanying message histories
         try:
-            # req_delete_account = "{'command':'delete-account', 'my_username':'%s', 'message':'Delete my account.'}"%(self.username)
-            # serialized_req = json.dumps(req_delete_account).encode()
             req_delete_account = (json.dumps({
                 'command':'message-sent',
                 'send_username':self.username,
@@ -646,16 +626,11 @@ class ClientSendThread(Thread):
                 elif(option == "--exit"):
                     #notify the server to delete message history for the client (session terminates)
                     self.request_delete_all_histories(self.username)
-
-                    #MUST notify the server here to remove client from auth_users + connections lists
                     self.close_server_conn()
                     return 0
 
                 #handle user logout - exit main menu scope
                 elif(option == "--logout"):
-                    #MUST notify the server here to remove client from auth_users + connections lists
-                    #self.close_server_conn()
-
                     #notify the server to delete message history for the client (session terminates)
                     self.request_delete_all_histories(self.username)
                     return 1
