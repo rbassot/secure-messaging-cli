@@ -188,7 +188,7 @@ class ClientSendThread(Thread):
         #display all user options
         self.locked_print("OPTIONS:")
         self.locked_print("--chat:<username>                Start a secure chat with an existing user.")
-        self.locked_print("--quit / --quit-chat              (From within a chat) Quit the chat and return to the main menu.")
+        self.locked_print("--quit / --quit-chat             (From within a chat) Quit the chat and return to the main menu.")
         self.locked_print("--send-image                     (From within a chat) Send an image-embedded chat message.")
         self.locked_print("--history:<username>             View your conversation history with a user.")
         self.locked_print("--delete-history:<username>      Delete your conversation history with a specific user.")
