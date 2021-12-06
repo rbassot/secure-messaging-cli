@@ -533,7 +533,7 @@ class ClientSendThread(Thread):
         ----------
         None
         '''
-        #ask the server to delete all conversations owned by this client
+        #ask the server to delete all conversations owned by this client + all associated OTPKs and KeyBundles
         try:
             req_delete_all = (json.dumps({
                 'command':'delete-all-histories',
@@ -650,7 +650,7 @@ class ClientSendThread(Thread):
                 elif(option == "--exit"):
                     #notify the server to delete message history for the client (session terminates)
                     self.request_delete_all_histories(self.username)
-                    self.delete_image_history(self.username, recv_user, False)
+                    self.delete_image_history(self.username, recv_user, True)
                     self.close_server_conn()
                     return 0
 
@@ -658,7 +658,7 @@ class ClientSendThread(Thread):
                 elif(option == "--logout"):
                     #notify the server to delete message history for the client (session terminates)
                     self.request_delete_all_histories(self.username)
-                    self.delete_image_history(self.username, recv_user, False)
+                    self.delete_image_history(self.username, recv_user, True)
                     return 1
 
                 #handle user retrieving conversation history

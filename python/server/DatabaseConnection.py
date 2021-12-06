@@ -138,6 +138,7 @@ class DatabaseConn():
             print("INSERT ERROR: " + str(e))
             return 0
 
+
     def delete_OTPK(self, username, public_OTPK):
         try:
             cursor = self.db_connection.cursor()
@@ -150,6 +151,36 @@ class DatabaseConn():
         
         except Exception as e:
             print("DELETE OneTimePrekey ERROR: " + str(e))
+            return 0
+
+    
+    def delete_all_OTPK(self, username):
+        try:
+            cursor = self.db_connection.cursor()
+
+            data = [username]
+            query = "DELETE FROM OTPK WHERE username = ?"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("DELETE All OneTimePrekeys ERROR: " + str(e))
+            return 0
+
+    
+    def delete_all_KeyBundles(self, username):
+        try:
+            cursor = self.db_connection.cursor()
+
+            data = [username]
+            query = "DELETE FROM KeyBundle WHERE username = ?"
+            cursor.execute(query, data)
+            self.db_connection.commit()
+            return 1
+        
+        except Exception as e:
+            print("DELETE All KeyBundles ERROR: " + str(e))
             return 0
 
 

@@ -412,10 +412,11 @@ class ServerThread(Thread):
     def delete_all_histories(self, this_username):
         '''
         Server-side deleting of every conversation history existing for the requesting
-        client. This operation is performed at every session termination for a client - 
-        logout, program exit, and account deletion. The reason for history deletion is
-        because Alice has no way of retrieving her private keys to decrypt past messages,
-        without saving a state outside of program execution.
+        client, and every OTPK + KeyBundle associated to that client. This operation is
+        performed at every session termination for a client - logout, program exit, and 
+        account deletion. The reason for history deletion is because Alice has no way of
+        retrieving her private keys to decrypt past messages, without saving a state
+        outside of program execution (see Bugs List in README).
 
         Parameters
         ----------
@@ -427,7 +428,9 @@ class ServerThread(Thread):
         None
         '''
         #delete all messages corresponding to the user's history with the specified client
-        if(not self.db_conn.delete_all_histories(this_username)):
+        #   + all OTPKs for that client
+        #   + all KeyBundles for that client
+        if(not self.db_conn.delete_all_histories(this_username) or not self.db_conn.delete_all_KeyBundles(this_username) or not self.db_conn.delete_all_OTPK(this_username)):
             print("Error deleting message history!")
             return
 
@@ -435,7 +438,7 @@ class ServerThread(Thread):
         delete_all_resp = {
             'command':'delete-all-histories',
             'response':'SUCCESS',
-            'message':'Successfully deleted all your conversation histories.'
+            'message':'Successfully deleted all your conversation histories and published keys.'
         }
         serialized_resp = json.dumps(delete_all_resp).encode()
         self.sock.send(serialized_resp)
