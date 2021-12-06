@@ -9,11 +9,7 @@ from ServerThread import ServerThread
 
 #----- Server Parameters -----
 HOST = '0.0.0.0'    #bind to public IP
-PORT = 50007
-connections = []    #list of all ongoing connections
-#users = {}          #dictionary of all connected users
-client_keys = {}    #dictionary of client keys needed for user authorization
-
+PORT = 50007        #TCP Port that the server runs at
 
 def start_server():
     '''
@@ -48,15 +44,11 @@ def start_server():
         #handle a connection on a new ClientThread
         print('Connection established to client at address: ' + str(client_addr))
 
-        #spawn a server thread obj dedicated to the client
+        #spawn a ServerThread object dedicated to the client
         ServerThread(client_sock, client_addr)
-        #config.connections.append(client_sock)
+
+        #send a 'connection established' message to the connected client
         client_sock.send(b"You are connected from: " + str(client_addr).encode())
-
-    #unreachable - how do we gracefully terminate the server? Do we even want to do this?
-    sock.close()
-    sys.exit()
-
 
 
 if __name__ == "__main__":

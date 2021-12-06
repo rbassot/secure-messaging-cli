@@ -4,11 +4,10 @@ from sys import *
 from socket import *
 from threading import *
 from queue import *
-from sqlite3 import * #For future database implementation
+from sqlite3 import *
 import os
 from time import *
 import json
-import ast
 import binascii
 
 import config
@@ -20,12 +19,9 @@ from cryptography.hazmat.primitives import hashes
 
 #----- Client Parameters -----
 SERVER_HOST = '127.0.0.1'                    #bind to public IP
-SERVER_PORT = 50007
+SERVER_PORT = 50007                          #TCP Port that the server runs at
 sock = socket(AF_INET, SOCK_STREAM)          #connection object to the server for client-to-client interactions
-#chat_socket = socket(AF_INET, SOCK_STREAM)   #connection object to the server to create 
-client_username = None
-client_key = None                            #dictionary of client keys needed for user authorization
-threads = []
+client_username = None                       #logged in client's username - to pass to client's child threads
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -48,14 +44,13 @@ def register_attempt():
         reg_digest.update(password.encode('utf-8'))
         hash_pass = reg_digest.finalize()
         # append salt to hash
-        hash_pass += salt  # cant convert to str
+        hash_pass += salt
         salt = None
         # parse encrypted_pass to str format and send to server
         hash_pass_bytes = binascii.hexlify(hash_pass)
         hash_pass_str = hash_pass_bytes.decode()
 
         #send formatted login data to server
-        # login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, hash_pass_str)
         login_req = (json.dumps({
             'command':'register', 
             'first':first_name,
@@ -63,14 +58,11 @@ def register_attempt():
             'username':username, 
             'password':hash_pass_str
         })).encode()
-        # login_req = "{'command':'register', 'first':'%s', 'last':'%s', 'username':'%s', 'password':'%s'}"%(first_name, last_name, username, password)
-        #must encrypt the login data here (encryption manager?)
-        # serialized_req = json.dumps(login_req).encode()
+
         sock.send(login_req)
 
         #receive response from server
         server_resp = json.loads(sock.recv(1024).decode())
-        # server_resp = ast.literal_eval(server_resp)
         print("Server response type: " + str(server_resp['response']))
 
         if(server_resp['response'] == 'SUCCESS'):
@@ -81,7 +73,6 @@ def register_attempt():
             print("Registration attempt failed!")
             return 0
 
-    #FIX!!
     except:
         print("Something went wrong...")
         return 0
@@ -94,19 +85,16 @@ def login_attempt():
 
     try:
         #send formatted login data to server
-        # login_req = "{'command':'login', 'username':'%s', 'password':'%s'}"%(username, password)
         login_req = (json.dumps({
             'command':'login', 
             'username':username, 
             'password':password
         })).encode()
-        #must encrypt the login data here (encryption manager?)
-        # serialized_req = json.dumps(login_req).encode()
+
         sock.send(login_req)
 
         #receive response from server
         server_resp = json.loads(sock.recv(1024).decode())
-        # server_resp = ast.literal_eval(server_resp)
         print("Server response type: " + str(server_resp['response']))
 
         if(server_resp['response'] == 'SUCCESS'):
@@ -120,7 +108,6 @@ def login_attempt():
             print("Log in attempt failed!")
             return 0
 
-    #FIX!!
     except:
         print("Something went wrong...")
         return 0
@@ -212,18 +199,15 @@ def start_client():
     print(recv_msg)
 
     #--- Login Menu ---
-    while True: #TO FIX: Needs to handle reconnecting to the server - The server should drop the prev closed connection then?
+    while True:
 
         #initial login/registration handling
         if(not login_or_register()):
             break
 
         #user has logged in: create 2 threads - one for sending, one for receiving
-        global threads
         send_thread = ClientSendThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
-        #threads.append(send_thread)
         recv_thread = ClientRecvThread(sock, (SERVER_HOST, SERVER_PORT), client_username)
-        #threads.append(recv_thread)
 
         #set threads to daemons for auto cleanup on program exit
         send_thread.daemon = True

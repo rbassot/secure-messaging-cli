@@ -8,8 +8,6 @@ from socket import *
 from threading import *
 from queue import *
 import json
-import ast
-#from PIL import Image
 
 import config
 from encryption import User
@@ -53,7 +51,7 @@ class ClientRecvThread(Thread):
         ----------
         None
         '''
-        Thread.__init__(self) #provide a common event for interthread communication between send/receive threads
+        Thread.__init__(self)
         self.sock = socket
         self.addr = address
         self.username = username
@@ -141,7 +139,7 @@ class ClientRecvThread(Thread):
         config.shared_event.clear()
 
         #listen to the chat and handle incoming messages
-        while True: #test if an event trigger is needed to break out of this loop
+        while True:
             try:
                 data = b''
                 part = b''
@@ -154,8 +152,6 @@ class ClientRecvThread(Thread):
                         break
                 
                 message_data = data
-                # print("message_data", message_data)
-                # message_data = self.sock.recv(1024).decode()
 
                 #chat connection was closed - stop listening
                 if not(message_data):
@@ -163,7 +159,6 @@ class ClientRecvThread(Thread):
 
                 #parse the message into a dictionary
                 message_json = json.loads(message_data)
-                # message_json = ast.literal_eval(message_json)
 
                 #print out the formatted message in blue to the client console
                 if(message_json['command'] == 'message-recv'):
@@ -188,7 +183,7 @@ class ClientRecvThread(Thread):
                         pilimage = pilimage.save(save_name)
                         self.locked_print('\033[94m' + "Image saved as: " + save_name + '\033[0m')
 
-                    #hanlde regular messages
+                    #handle regular messages
                     else:
                         message_str = str(other_username) + ": " + str(decrypted_msg)
                         self.locked_print('\033[94m' + message_str + '\033[0m')
@@ -244,8 +239,6 @@ class ClientRecvThread(Thread):
         return
 
     
-    #Receiver-side chat initialization for the RecvThread
-    #listener thread actually peforms a send here, to establish chat connection
     def accept_chat_req(self, send_username):
         '''
         ClientB's RecvThread handling to send a confirmation to the server
@@ -268,6 +261,7 @@ class ClientRecvThread(Thread):
         
         #wait on SendThread to accept the request
         config.shared_event.wait()
+
         #create formatted response string for the server
         resp_to_connect = (json.dumps({
             'command':'accept-chat-req',
@@ -277,9 +271,6 @@ class ClientRecvThread(Thread):
             'message':'The other client accepted the chat request.'
         })).encode()
         self.sock.send(resp_to_connect)
-
-        #set the event such that this client's sender thread can continue
-        #self.event.set() REMOVE THIS?
 
         #listen to the new chat
         #receiver-side user chat scenario
@@ -320,8 +311,6 @@ class ClientRecvThread(Thread):
             try:
                 #decrypt the sent messages from the server, then format and print to screen
                 encr_message = str(row[3])
-                # #decrypt...
-
                 enc_msg_hex = encr_message.encode('utf-8')
                 enc_msg_bytes = binascii.unhexlify(enc_msg_hex)
 
@@ -362,9 +351,9 @@ class ClientRecvThread(Thread):
         None
         '''
         running = True
-        while running: #test if an event trigger is needed to break out of this loop
+        while running:
             try:
-                # getting size of serialized data
+                # receiving serialized data in chunks
                 data = b''
                 part = b''
 
@@ -384,10 +373,6 @@ class ClientRecvThread(Thread):
 
                 #parse the server's message into a dictionary
                 server_resp = json.loads(server_data)
-                # server_resp = ast.literal_eval(server_resp)
-
-                #check server response type for state of the response
-                #self.locked_print("Server response type: " + str(server_resp['response']))
 
                 #Enter Chat Part 2 - receive chat request from a sender client
                 if(server_resp['command'] == 'req-chat-from'):
@@ -401,7 +386,6 @@ class ClientRecvThread(Thread):
                 #handle receiving conversation history from the server
                 elif(server_resp['command'] == 'history'):
                     #destringify the message list back into a list - apply literal_eval again
-                    # message_list = ast.literal_eval(server_resp['message_list'])
                     message_list = server_resp['message_list']
                     if message_list:
                         self.format_message_history(server_resp['other_username'], message_list)

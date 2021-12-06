@@ -18,7 +18,6 @@ Database Connection class to handle communication from a server thread to the se
 class DatabaseConn():
     def __init__(self):
         self.db_connection = sqlite3.connect('python-sm.db', check_same_thread=False)
-        #self.db_cursor = self.db_connection.cursor()
 
         #create both tables initially, if they are not created already
         self.create_Account_table()
@@ -98,10 +97,8 @@ class DatabaseConn():
 
 
     def insert_new_message(self, owner_username, send_username, recv_username, encr_message):
-        #get row count for ID field
         try:
             cursor = self.db_connection.cursor()
-            #row_count = self.get_Message_row_count()
             data = [owner_username, send_username, recv_username, encr_message]
             query = "INSERT INTO Message(owned_username, send_username, recv_username, encr_message) VALUES(?, ?, ?, ?)"
             cursor.execute(query, data)

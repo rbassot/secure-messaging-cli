@@ -7,8 +7,6 @@ from threading import *
 from queue import *
 from time import *
 import json
-import ast
-#from PIL import Image
 
 import config
 from encryption import User
@@ -16,7 +14,6 @@ import binascii
 
 # Image conversion
 from PIL import Image
-import io
 import base64
 
 '''
@@ -217,7 +214,7 @@ class ClientSendThread(Thread):
         #notify the server that connection should be terminated
         self.sock.shutdown(SHUT_RDWR)
         self.sock.close()
-        self.locked_print("(Send Thread) Connection was closed. Program is exiting gracefully.")
+        self.locked_print("Connection was closed. Program is exiting gracefully.")
         return
 
     
