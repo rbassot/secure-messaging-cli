@@ -24,8 +24,54 @@ HKDF_SALT = b'\0' * HKDF_LEN
 server = DatabaseConn()
 
 class User():
-
     def __init__(self, username):
+        '''
+        Initializes a User object and generates keys pair. Public keys are sent 
+        to the server, secret keys are kept in the object.
+        
+        Attributes
+        ----------
+        self.username: str
+            Client's username.
+
+        self.key_bundles: dictionary
+            Client's "contacts". Holds "contacts" public keys
+
+        self.secret_IK: x25519.X25519PrivateKey
+            Client's secrete identity key.
+
+        self.public_IK: x25519.X25519PublicKey
+            Client's public identity key.
+
+        self.secret_ED: ed25519.Ed25519PrivateKey
+            Client's secrete Edwards key, used for signing keys.
+
+        self.public_ED: ed25519.Ed25519PublicKey
+            Client's secrete Edwards key, used for verifying signatures.
+        
+        self.secret_SPK: x25519.X25519PrivateKey
+            Client's secrete signed prekey.
+
+        self.public_SPK: x25519.X25519PublicKey
+            Client's public signed prekey.
+
+        self.Signature: bytes
+            Output from signing public SPK with secret ED.
+        
+        self.secret_OTPK: list of tuples (x25519.X25519PrivateKey, x25519.X25519PublicKey)
+            List holding 100 tuples (secret_OTPK, public_OTPK)
+
+        self.public_OTPK: list of x25519.X25519PublicKey
+            List holding 100 public One-time prekeys
+
+        self.AESGCM: list of bytes
+            List holding AESGCM encryption keys. Used to decrypt Client's own 
+            message when viewing history.
+
+        Returns
+        ----------
+        None
+        '''
         self.username = username
         self.key_bundles = {}   # Stores "recent" contacts' key bundles
 
@@ -55,6 +101,14 @@ class User():
     def generate_OTPK(self):
         '''
         Generates 100 OneTimePrekeys pairs and sends public keys to the server.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
         '''
         for i in range(MAX_ONE_TIME_PREKEY):
             secret_key = x25519.X25519PrivateKey.generate()
@@ -72,6 +126,14 @@ class User():
     def publish_key_bundle(self):
         '''
         Send public keys to the server.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        ----------
+        None
         '''
         server.create_KeyBundle_table()
 
@@ -83,18 +145,28 @@ class User():
             self.Signature
         )
 
-    # def send_msg(self, receiver, message):
+
     def encrypt_msg(self, receiver, message):
         '''
         Generates a shared key using the X3DH protocol, and encrypts
         the message using AES-GCM.
+
+        Parameters
+        ----------
+        receiver: str
+            Receiver username.
+        
+        message: str
+            Message to be encrypted.
+
+        Returns
+        ----------
+        encrypted_msg: bytes
+            Encrypted message.
         '''
         # Get receiver's key bundle
             # get_key_bundle will add receiver to self.key_bundles[receiver]
             # access data via self.key_bundles[receiver][X], data = Object, not bytes
-        # if self.has_key_bundle(receiver) is False:
-        #     print("Could not retreive <", receiver, "> key bundle")
-        #     return
         self.has_key_bundle(receiver)
 
         recv_key_bundle = self.key_bundles[receiver]
@@ -119,14 +191,12 @@ class User():
         message_bytes = message.encode('utf-8')
     
         # Sign msg and key combination
-        # signature = self.secret_ED.sign(key_combination + msg_contents)
         signature = self.secret_ED.sign(key_combination + message_bytes)
 
         # Build payload
         sender_IK_bytes = self.get_bytes(self.public_IK, False)
         recv_IK_bytes = self.get_bytes(recv_key_bundle['IK'], False)
 
-        # payload = signature + sender_IK_bytes + recv_IK_bytes + msg_contents
         payload = signature + sender_IK_bytes + recv_IK_bytes + message_bytes
 
         # Encrypt payload
@@ -144,33 +214,20 @@ class User():
 
         return encrypted_msg
 
-        # print()
-        # print("     Message Sent:   ", message)
-        # print()
-
-    # def decrypt_own_msg(self, encrypted_msg, receiver):
-    #     NONCE_START = 96
-    #     NONCE_FIN = NONCE_START + 12
-    #     TAG_FIN = NONCE_FIN + 16
-
-    #     nonce = encrypted_msg[NONCE_START: NONCE_FIN]
-    #     tag = encrypted_msg[NONCE_FIN: TAG_FIN]
-    #     ciphertext = encrypted_msg[TAG_FIN:]
-
-    #     for i in range(len(self.AESGCM)):
-    #         if(self.AESGCM[i][0] == receiver):
-    #             AESGCM_KEY = self.AESGCM[i][1]
-    #             payload = AESGCM_KEY.decrypt(nonce, ciphertext, None)
-    #             msg_contents = payload[128:]
-    #             decrypted_msg = msg_contents.decode()
-    #             return decrypted_msg
-        
-
-
 
     def calc_sk(self, key_material) -> bytes:
         '''
         Derives a shared key from a key material; uses SHA-256.
+
+        Parameters
+        ----------
+        key_meterial: bytes
+            Key material from X3DH.
+
+        Returns
+        ----------
+        shared_key: bytes
+            Shared key from HKDF.
         '''
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -184,7 +241,17 @@ class User():
 
     def gen_key_combination(self, receiver) -> bytes:
         '''
-        Calculates sender_IK + sender_EK + recv_OTPK
+        Calculates key combination, which is sender_IK + sender_EK + recv_OTPK
+        
+        Parameters
+        ----------
+        receiver: str
+            User to be establish shared key connection.
+
+        Returns
+        ----------
+        key_combination: bytes
+            The result of sender_IK + sender_EK + recv_OTPK.
         '''
         recv_key_bundle = self.key_bundles[receiver]
 
@@ -201,8 +268,17 @@ class User():
     def X3DH(self, receiver) -> bytes:
         '''
         Applies Extended Triple Diffie-Hellman and returns key meterial
-        '''
 
+        Parameters
+        ----------
+        receiver: str
+            User to be establish shared key connection.
+
+        Returns
+        ----------
+        key_material: bytes
+            DH exchange results.
+        '''
         recv_key_bundle = self.key_bundles[receiver]
         
         # verify prekey signature
@@ -237,13 +313,27 @@ class User():
         return key_material
 
 
-    # def recv_msg(self, sender):
     def decrypt_msg(self, sender, encrypted_msg, is_own_msg):
         '''
         Calculates a shared key using the first 124 bytes of the encrypted_msg, 
         then tries to decrypt message using the calculated shared key.
-        '''
 
+        Parameters
+        ----------
+        sender: str
+            Sender's username
+
+        encrypted_msg: bytes
+            Message to be decrypted
+
+        is_own_msg: boolean
+            Flag to determine if encrypted_msg is the User's own message.
+
+        Returns
+        ----------
+        message: str
+            Decrypted message.
+        '''
         # Indexes to find information in encrypted msg
         IK_FIN = 32
         EK_FIN = 64
@@ -259,15 +349,11 @@ class User():
             ciphertext = encrypted_msg[TAG_FIN:]
             payload = None
 
-            # print("OWN MSG:", encrypted_msg)
-
             for i in range(len(self.AESGCM)):
                 if(self.AESGCM[i][0] == sender):
                     try:
                         AESGCM_KEY = self.AESGCM[i][1]
-                        # print("aesgcm key:", AESGCM_KEY)
                         payload = AESGCM_KEY.decrypt(nonce, ciphertext, None)
-                        # print(payload, type(payload), len(payload))
                     except InvalidTag as e:
                         continue
                     msg_contents = payload[128:]
@@ -280,8 +366,7 @@ class User():
         else:
             # Retrive sender's key bundle from server
             sender_key_bundle = None
-            # if self.has_key_bundle(sender) is False:
-            #     print("Could not retreive <", sender, "> key bundle")
+
             self.has_key_bundle(sender)
             
             sender_key_bundle = self.key_bundles[sender]
@@ -305,7 +390,6 @@ class User():
             if secret_OTPK is None:
                 print("ERROR - Cannot find private OneTimePrekey used!")
                 return
-
 
             # Calculate key material - applying reverse X3DH
             sender_IK = self.get_pub_key(msg_public_IK, False)
@@ -340,7 +424,6 @@ class User():
             msg_ad = payload[64:128]
             msg_contents = payload[128:]
             
-
             # Check if encrypted msg AD matches server AD;  AD = sender_IK + recv_IK
             sender_IK_bytes = self.get_bytes(sender_key_bundle['IK'], False)
             recv_IK_bytes = self.get_bytes(self.public_IK, False)
@@ -356,35 +439,26 @@ class User():
                 sender_key_bundle['ED'].verify(msg_signature, key_combination + msg_contents)
             except InvalidSignature as err:
                 return err
-            
             # msg is decrypted + intact
-            # TODO - Delete SECRET OneTimePrekeys - https://signal.org/docs/specifications/x3dh/#receiving-the-initial-message
-            # Must delete public keys but can keep secret keys for a little bit
 
             # Decode message - currently in bytes
             decrypted_msg = msg_contents.decode()
-            # msg = json.loads(decoded_msg)
 
-            # print()
-            # print("     Message Received:   ", msg['msg'])
-            # print()
-            # return msg['msg']
             return decrypted_msg
 
-
-        ##### Sanity Check #####
-        # print("MESSAGE INFORMATION")
-        # print("public_IK:       ", sender_public_IK)
-        # print("public_EK:       ", sender_public_EK)
-        # print("public_OTPK:     ", recv_public_OTPK)
-        # print("nonce:           ", msg_nonce)
-        # print("tag:             ", msg_tag)
-        # print("ct:              ", msg_ciphertext)
-        
 
     def has_key_bundle(self, receiver):
         '''
         Checks if user1 has user2 key_bundle; adds user2 key_bundle to user1.
+        
+        Parameters
+        ----------
+        receiver: str
+            Receiver's username.
+
+        Returns
+        ----------
+        None
         '''
         # TODO - Ensure server key_bundle is up to date
         #      - Ensure sender updates receiver's key_bundle
@@ -423,9 +497,23 @@ class User():
             }
             return
 
+
     def get_sec_key(self, secret_byte, is_Edwards):
         '''
         Converts bytes to a secret key object
+        
+        Parameters
+        ----------
+        secret_byte: bytes
+            Bytes to be converted into a secret key
+        
+        is_Edwards: boolean
+            Determines the format of converted secret key
+
+        Returns
+        ----------
+        sec_key: x25519.X25519PrivateKey or ed25519.Ed25519PrivateKey
+            Secret key in x25519 or ed25519 format.
         '''
         if is_Edwards is True:
             sec_key = ed25519.Ed25519PrivateKey.from_private_bytes(secret_byte)
@@ -434,9 +522,23 @@ class User():
         sec_key = x25519.X25519PrivateKey.from_private_bytes(secret_byte)
         return sec_key
 
+
     def get_pub_key(self, public_byte, is_Edwards):
         '''
         Converts bytes to a public key object
+        
+        Parameters
+        ----------
+        public_byte: bytes
+            Bytes to be converted into a public key
+        
+        is_Edwards: boolean
+            Determines the format of converted public key
+
+        Returns
+        ----------
+        pub_key: x25519.X25519PublicKey or ed25519.Ed25519PublicKey
+            Secret key in x25519 or ed25519 format.
         '''
         if is_Edwards is True:
             pub_key = ed25519.Ed25519PublicKey.from_public_bytes(public_byte)
@@ -445,9 +547,24 @@ class User():
         pub_key = x25519.X25519PublicKey.from_public_bytes(public_byte)
         return pub_key
 
+
     def get_bytes(self, key, is_secret) -> bytes:
         '''
-        Converts a key object into bytes
+        Converts a key object into bytes.
+        
+        Parameters
+        ----------
+        key: x25519 or ed25519
+            x25519 or ed25519 key object to be converted to bytes.
+        
+        is_secret: boolean
+            Distinguishes which convertion method to use. True if key is secret, 
+            false otherwise.
+
+        Returns
+        ----------
+        key_bytes: bytes
+            Bytes from given key object.
         '''
         if is_secret is True:
             key_bytes = key.private_bytes(
