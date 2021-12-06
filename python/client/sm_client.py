@@ -9,6 +9,7 @@ import os
 from time import *
 import json
 import binascii
+import getpass
 
 import config
 
@@ -33,7 +34,7 @@ def register_attempt():
     first_name = input("First name: ")
     last_name = input("Last name: ")
     username = input("Username: ")
-    password = input("Password: ")
+    password = getpass.getpass("Password: ")
 
     try:
         # start pass encryption
@@ -50,8 +51,8 @@ def register_attempt():
         hash_pass_bytes = binascii.hexlify(hash_pass)
         hash_pass_str = hash_pass_bytes.decode()
 
-        #send formatted login data to server
-        login_req = (json.dumps({
+        #send formatted registration data to server
+        regist_req = (json.dumps({
             'command':'register', 
             'first':first_name,
             'last':last_name,
@@ -59,7 +60,7 @@ def register_attempt():
             'password':hash_pass_str
         })).encode()
 
-        sock.send(login_req)
+        sock.send(regist_req)
 
         #receive response from server
         server_resp = json.loads(sock.recv(1024).decode())
@@ -81,7 +82,7 @@ def register_attempt():
 def login_attempt():
     clear_screen()
     username = input("Username: ")
-    password = input("Password: ")
+    password = getpass.getpass("Password: ")
 
     try:
         #send formatted login data to server
