@@ -42,6 +42,7 @@ The repository is partitioned into two subdirectories: `/python/client`, and `/p
 seng360-a3 (root)
 │   README.md
 │   python-sm.db    
+│   __init__.py
 │
 └───python
     │   __init__.py
@@ -90,7 +91,7 @@ Finally, all program exit cases - logout, account deletion, and application exit
 
 ## Encryption Implementations
 ### Message Encryption Overview
-To achieve end-to-end encryption with perfect forward secrecy we've implemented a derivation of Signal Protocol [[1]](https://en.wikipedia.org/wiki/Signal_Protocol). This application uses the Extended Triple Diffie-Hellman (X3DH) to derive a shared key between two users and then encrypts messages using an AEAD encryption scheme (AES-GCM) with the derived shared key. We chose X3DH due to it's deniability property, X3DH doesn't give either Alice or Bob a publishable cryptographic proof of the contents of their communication or the fact that they communicated [[2]](https://signal.org/docs/specifications/x3dh/). This [section](#x3dh) explains the scenario where Alice wants to send Bob a message.
+To achieve end-to-end encryption with perfect forward secrecy we've implemented a derivation of Signal Protocol [[1]](https://en.wikipedia.org/wiki/Signal_Protocol). This application uses the Extended Triple Diffie-Hellman (X3DH) to derive a shared key between two users and then encrypts messages using an AEAD encryption scheme (AES-GCM) with the derived shared key. We chose X3DH due to its deniability property, X3DH doesn't give either Alice or Bob a publishable cryptographic proof of the contents of their communication or the fact that they communicated [[2]](https://signal.org/docs/specifications/x3dh/). This [section](#x3dh) explains the scenario where Alice wants to send Bob a message.
 
 ### <a name="x3dh"></a> X3DH Key Agreement Protocol [[2]](https://signal.org/docs/specifications/x3dh/)
 X3DH (or "Extended Triple Diffie-Hellman") key agreement protocol establishes a shared secret key between two parties who mutually authenticate each other based on public keys. 
