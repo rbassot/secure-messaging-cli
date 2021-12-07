@@ -21,8 +21,6 @@ import base64
 #colored output
 from termcolor import colored, cprint
 
-# delete img hist
-import shutil
 '''
 Basic ClientRecvThread class for the client-side to continually listen to the server.
 '''
