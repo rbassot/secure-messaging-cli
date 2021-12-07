@@ -90,7 +90,7 @@ Finally, all program exit cases - logout, account deletion, and application exit
 
 ## Encryption Implementations
 ### Message Encryption Overview
-To achieve end-to-end encryption with perfect forward secrecy we've implemented a derivation of Signal Protocol [[1]](https://en.wikipedia.org/wiki/Signal_Protocol). This application uses the Extended Triple Diffie-Hellman (X3DH) to derive a shared key between two users and then encrypts messages using an AEAD encryption scheme (AES-GCM) with the derived shared key. This [section](#x3dh) explains the scenario where Alice wants to send Bob a message.
+To achieve end-to-end encryption with perfect forward secrecy we've implemented a derivation of Signal Protocol [[1]](https://en.wikipedia.org/wiki/Signal_Protocol). This application uses the Extended Triple Diffie-Hellman (X3DH) to derive a shared key between two users and then encrypts messages using an AEAD encryption scheme (AES-GCM) with the derived shared key. We chose X3DH due to it's deniability property, X3DH doesn't give either Alice or Bob a publishable cryptographic proof of the contents of their communication or the fact that they communicated [[2]](https://signal.org/docs/specifications/x3dh/). This [section](#x3dh) explains the scenario where Alice wants to send Bob a message.
 
 ### <a name="x3dh"></a> X3DH Key Agreement Protocol [[2]](https://signal.org/docs/specifications/x3dh/)
 X3DH (or "Extended Triple Diffie-Hellman") key agreement protocol establishes a shared secret key between two parties who mutually authenticate each other based on public keys. 
@@ -124,7 +124,7 @@ After fetching Bob's key bundle and One-time prekey from the server, Alice verif
 
 Where the `HDFK` is an HMAC-based Extract-and-Expand Key Derivation Function, i.e. a fixed cost algorithm Key Derivation Function. The value of `F` is 32 bytes of `0xFF` as per the [protocol definition](https://signal.org/docs/specifications/x3dh/#cryptographic-notation).
 
-![X3DH Shared Key Calculation](uploads/70fa50f5f7c36baa0e1e4600d0b4ec3d/X3DH.png)
+![X3DH Shared Key Calculation](https://signal.org/docs/specifications/x3dh/X3DH.png)
 
 
 #### Encrypting Message
@@ -212,7 +212,7 @@ Clients run on their own distinct Port numbers, and each in their own terminal w
 4. From here, application menus provide detailed descriptions of features accessible to each client user. In most menus, users have the option to display all present options that they have from a specific menu. This can be shown with the following command at the user's in-application command prompt:
 `--options`
 
-### Quitting the program
+### <a name="quitting-the-program"></a> Quitting the program
 Clients can individually logout and quit the program via in-application commands.
 The server runs indefinitely and must be killed externally from another program, to free up Port 50007 from the running server process. An example of a command to achieve this (in Windows) is:
 `npx kill-port 50007`
