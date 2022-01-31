@@ -11,7 +11,7 @@ Raphael Bassot, V00896541
 ## About The Project
 **Python CLI Secure Messaging** is a fast, secure command-line based chat application built entirely in Python. Chats are performed in real-time between two clients who establish a shared connection. This project follows a client-server model, where the running server acts as an intermediary to service all clients.
 
-![Python-CLI-SM-clip](Python-CLI-SM-clip.mp4)
+![](res\python-secure-messaging-cli.png)
 
 Every client and server runs in a multi-threaded environment leveraging Python's *threading* module. Once logged into the system, a running client spawns a sender thread and a receiver thread, to handle sending requests and receiving responses respectively. To handle multiple clients, the server spawns a new thread dedicated to each client connection established over a TCP socket. Concurrency allows each client and the main server to perform multiple tasks at once, and achieve proper synchronization between tasks.
 
@@ -39,28 +39,30 @@ The implemented encryption methods and protocols are discussed in detail below: 
 The repository is partitioned into two subdirectories: `/python/client`, and `/python/server`. Each subdirectory implements the large majority of functionality for each of the system's entities. The file structure of the repository can be seen below:
 
 ```
-seng360-a3 (root)
+secure-messaging-cli (root)
 │   README.md
 │   python-sm.db    
 │   __init__.py
 │
 └───python
-    │   __init__.py
-    │
-    └───client
-    │   │   __init__.py
-    │   │   ClientSendThread.py
-    │   │   ClientRecvThread.py
-    │   │   encryption.py
-    │   │   sm_client.py
-    │   │   config.py
-    │   
-    └───server
-        │   __init__.py
-        │   ServerThread.py
-        │   DatabaseConnection.py
-        │   sm_server.py
-        │   config.py
+|   │   __init__.py
+|   │
+|   └───client
+|   │   │   __init__.py
+|   │   │   ClientSendThread.py
+|   │   │   ClientRecvThread.py
+|   │   │   encryption.py
+|   │   │   sm_client.py
+|   │   │   config.py
+|   │   
+|   └───server
+|       │   __init__.py
+|       │   ServerThread.py
+|       │   DatabaseConnection.py
+|       │   sm_server.py
+|       │   config.py
+|
+└───res
 ```
 
 ### The Server
