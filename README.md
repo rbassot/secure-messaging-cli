@@ -71,7 +71,7 @@ The server implementation starts by running `sm_server.py`. This starts a contin
 Each ServerThread handles one respective client's requests, including notifying other clients about chat initiation, forwarding messages to the correct receiver, etc. This implementation completely isolates the clients, as they never actually communicate directly, by instead relying on the server to answer requests, read from & write to the database, and forward chat messages. This central server model, as well as the database adapter and some encryption steps, can be seen in our Data Flow Diagram below:
 
 #### DFD Diagram
-![dfd-seng360](dfd-seng360.png)
+![dfd-seng360](/res/dfd-seng360.png)
 
 
 For data persistence, ServerThread instances query the SQLite3 database - stored at `python-sm.db` in the repository -  through their `.db_conn` object (of type sqlite3.Connection). This allows them to store information into one of the four database tables for the application, as well as retrieve any required information. Read-access to the database is only permitted from the server side of the application. The persisting `.db` file is regenerated automatically at every start up of the server.
